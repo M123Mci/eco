@@ -1,0 +1,533 @@
+package com.willfp.eco.internal.spigot
+
+import com.willfp.eco.core.Eco
+import com.willfp.eco.core.EcoPlugin
+import com.willfp.eco.core.Prerequisite
+import com.willfp.eco.core.blocks.Blocks
+import com.willfp.eco.core.data.ExternalDataStore
+import com.willfp.eco.core.entities.Entities
+import com.willfp.eco.core.integrations.IntegrationLoader
+import com.willfp.eco.core.integrations.afk.AFKManager
+import com.willfp.eco.core.integrations.anticheat.AnticheatManager
+import com.willfp.eco.core.integrations.antigrief.AntigriefManager
+import com.willfp.eco.core.integrations.customblocks.CustomBlocksManager
+import com.willfp.eco.core.integrations.customentities.CustomEntitiesManager
+import com.willfp.eco.core.integrations.customitems.CustomItemsManager
+import com.willfp.eco.core.integrations.economy.EconomyManager
+import com.willfp.eco.core.integrations.hologram.HologramManager
+import com.willfp.eco.core.integrations.mcmmo.McmmoManager
+import com.willfp.eco.core.integrations.placeholder.PlaceholderManager
+import com.willfp.eco.core.integrations.shop.ShopManager
+import com.willfp.eco.core.items.Items
+import com.willfp.eco.core.packet.PacketListener
+import com.willfp.eco.core.particle.Particles
+import com.willfp.eco.core.price.Prices
+import com.willfp.eco.core.recipe.Recipes
+import com.willfp.eco.internal.blocks.BlockArgParserAgeable
+import com.willfp.eco.internal.blocks.BlockArgParserAnaloguePowerable
+import com.willfp.eco.internal.blocks.BlockArgParserAttachable
+import com.willfp.eco.internal.blocks.BlockArgParserBamboo
+import com.willfp.eco.internal.blocks.BlockArgParserBisected
+import com.willfp.eco.internal.blocks.BlockArgParserBubbleColumn
+import com.willfp.eco.internal.blocks.BlockArgParserCake
+import com.willfp.eco.internal.blocks.BlockArgParserCampfire
+import com.willfp.eco.internal.blocks.BlockArgParserCaveVinesPlant
+import com.willfp.eco.internal.blocks.BlockArgParserChest
+import com.willfp.eco.internal.blocks.BlockArgParserCommandBlock
+import com.willfp.eco.internal.blocks.BlockArgParserComparator
+import com.willfp.eco.internal.blocks.BlockArgParserCrafter
+import com.willfp.eco.internal.blocks.BlockArgParserDaylightDetector
+import com.willfp.eco.internal.blocks.BlockArgParserDirectional
+import com.willfp.eco.internal.blocks.BlockArgParserDispenser
+import com.willfp.eco.internal.blocks.BlockArgParserDoor
+import com.willfp.eco.internal.blocks.BlockArgParserEndPortalFrame
+import com.willfp.eco.internal.blocks.BlockArgParserFaceAttachable
+import com.willfp.eco.internal.blocks.BlockArgParserFarmland
+import com.willfp.eco.internal.blocks.BlockArgParserGate
+import com.willfp.eco.internal.blocks.BlockArgParserHangable
+import com.willfp.eco.internal.blocks.BlockArgParserHangingMoss
+import com.willfp.eco.internal.blocks.BlockArgParserJigsaw
+import com.willfp.eco.internal.blocks.BlockArgParserLevelled
+import com.willfp.eco.internal.blocks.BlockArgParserLightable
+import com.willfp.eco.internal.blocks.BlockArgParserMossyCarpet
+import com.willfp.eco.internal.blocks.BlockArgParserMultipleFacing
+import com.willfp.eco.internal.blocks.BlockArgParserNoteBlock
+import com.willfp.eco.internal.blocks.BlockArgParserOpenable
+import com.willfp.eco.internal.blocks.BlockArgParserOrientable
+import com.willfp.eco.internal.blocks.BlockArgParserPointedDripstone
+import com.willfp.eco.internal.blocks.BlockArgParserPowerable
+import com.willfp.eco.internal.blocks.BlockArgParserQuantity
+import com.willfp.eco.internal.blocks.BlockArgParserRail
+import com.willfp.eco.internal.blocks.BlockArgParserRedstoneWire
+import com.willfp.eco.internal.blocks.BlockArgParserRepeater
+import com.willfp.eco.internal.blocks.BlockArgParserRespawnAnchor
+import com.willfp.eco.internal.blocks.BlockArgParserRotatable
+import com.willfp.eco.internal.blocks.BlockArgParserScaffolding
+import com.willfp.eco.internal.blocks.BlockArgParserSculkSensor
+import com.willfp.eco.internal.blocks.BlockArgParserSculkShrieker
+import com.willfp.eco.internal.blocks.BlockArgParserSlab
+import com.willfp.eco.internal.blocks.BlockArgParserSnow
+import com.willfp.eco.internal.blocks.BlockArgParserSnowy
+import com.willfp.eco.internal.blocks.BlockArgParserStairs
+import com.willfp.eco.internal.blocks.BlockArgParserStructureBlock
+import com.willfp.eco.internal.blocks.BlockArgParserTNT
+import com.willfp.eco.internal.blocks.BlockArgParserTrial
+import com.willfp.eco.internal.blocks.BlockArgParserTripwire
+import com.willfp.eco.internal.blocks.BlockArgParserWall
+import com.willfp.eco.internal.blocks.BlockArgParserWaterlogged
+import com.willfp.eco.internal.blocks.tags.VanillaBlockTags
+import com.willfp.eco.internal.data.MavenVersionToStringAdapter
+import com.willfp.eco.internal.data.VersionToStringAdapter
+import com.willfp.eco.internal.entities.EntityArgParserAdult
+import com.willfp.eco.internal.entities.EntityArgParserAttackDamage
+import com.willfp.eco.internal.entities.EntityArgParserAttackSpeed
+import com.willfp.eco.internal.entities.EntityArgParserBaby
+import com.willfp.eco.internal.entities.EntityArgParserCharged
+import com.willfp.eco.internal.entities.EntityArgParserEquipment
+import com.willfp.eco.internal.entities.EntityArgParserExplosionRadius
+import com.willfp.eco.internal.entities.EntityArgParserFirework
+import com.willfp.eco.internal.entities.EntityArgParserFlySpeed
+import com.willfp.eco.internal.entities.EntityArgParserFollowRange
+import com.willfp.eco.internal.entities.EntityArgParserHealth
+import com.willfp.eco.internal.entities.EntityArgParserJumpStrength
+import com.willfp.eco.internal.entities.EntityArgParserKnockback
+import com.willfp.eco.internal.entities.EntityArgParserKnockbackResistance
+import com.willfp.eco.internal.entities.EntityArgParserName
+import com.willfp.eco.internal.entities.EntityArgParserNoAI
+import com.willfp.eco.internal.entities.EntityArgParserScale
+import com.willfp.eco.internal.entities.EntityArgParserSilent
+import com.willfp.eco.internal.entities.EntityArgParserSize
+import com.willfp.eco.internal.entities.EntityArgParserSpawnReinforcements
+import com.willfp.eco.internal.entities.EntityArgParserSpeed
+import com.willfp.eco.internal.items.ArgParserAttribute
+import com.willfp.eco.internal.items.ArgParserColor
+import com.willfp.eco.internal.items.ArgParserCustomModelData
+import com.willfp.eco.internal.items.ArgParserEnchantment
+import com.willfp.eco.internal.items.ArgParserEntity
+import com.willfp.eco.internal.items.ArgParserFireResistant
+import com.willfp.eco.internal.items.ArgParserFireworkBuilder
+import com.willfp.eco.internal.items.ArgParserFireworkPower
+import com.willfp.eco.internal.items.ArgParserFlag
+import com.willfp.eco.internal.items.ArgParserGlider
+import com.willfp.eco.internal.items.ArgParserGlint
+import com.willfp.eco.internal.items.ArgParserHead
+import com.willfp.eco.internal.items.ArgParserItemModel
+import com.willfp.eco.internal.items.ArgParserItemName
+import com.willfp.eco.internal.items.ArgParserMaxDamage
+import com.willfp.eco.internal.items.ArgParserMaxStackSize
+import com.willfp.eco.internal.items.ArgParserName
+import com.willfp.eco.internal.items.ArgParserPotionBuilder
+import com.willfp.eco.internal.items.ArgParserTexture
+import com.willfp.eco.internal.items.ArgParserTooltipStyle
+import com.willfp.eco.internal.items.ArgParserTrim
+import com.willfp.eco.internal.items.ArgParserUnbreakable
+import com.willfp.eco.internal.items.tags.VanillaItemTags
+import com.willfp.eco.internal.lookup.SegmentParserGroup
+import com.willfp.eco.internal.lookup.SegmentParserUseIfPresent
+import com.willfp.eco.internal.particle.ParticleFactoryRGB
+import com.willfp.eco.internal.price.PriceFactoryEconomy
+import com.willfp.eco.internal.price.PriceFactoryXP
+import com.willfp.eco.internal.price.PriceFactoryXPLevels
+import com.willfp.eco.internal.spigot.arrows.ArrowDataListener
+import com.willfp.eco.internal.spigot.data.DataYml
+import com.willfp.eco.internal.spigot.data.PlayerBlockListener
+import com.willfp.eco.internal.spigot.data.profiles.ProfileHandler
+import com.willfp.eco.internal.spigot.data.profiles.ProfileLoadListener
+import com.willfp.eco.internal.spigot.drops.CollatedRunnable
+import com.willfp.eco.internal.spigot.eventlisteners.AutocrafterPatch
+import com.willfp.eco.internal.spigot.eventlisteners.EntityDeathByEntityListeners
+import com.willfp.eco.internal.spigot.eventlisteners.NaturalExpGainListenersPaper
+import com.willfp.eco.internal.spigot.eventlisteners.NaturalExpGainListenersSpigot
+import com.willfp.eco.internal.spigot.eventlisteners.PlayerHealthPatch
+import com.willfp.eco.internal.spigot.eventlisteners.PlayerJumpListenersPaper
+import com.willfp.eco.internal.spigot.eventlisteners.PlayerJumpListenersSpigot
+import com.willfp.eco.internal.spigot.eventlisteners.armor.ArmorChangeEventListeners
+import com.willfp.eco.internal.spigot.eventlisteners.armor.ArmorListener
+import com.willfp.eco.internal.spigot.gui.GUIListener
+import com.willfp.eco.internal.spigot.integrations.afk.AFKIntegrationCMI
+import com.willfp.eco.internal.spigot.integrations.afk.AFKIntegrationEssentials
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefBentoBox
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefDeluxeCombat
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefFabledSkyBlock
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefFactionsUUID
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefGriefPrevention
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefHuskClaims
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefHuskTowns
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefIridiumSkyblock
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefSuperiorSkyblock2
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefTowny
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefWorldGuard
+import com.willfp.eco.internal.spigot.integrations.customblocks.CustomBlocksCraftEngine
+import com.willfp.eco.internal.spigot.integrations.customblocks.CustomBlocksItemsAdder
+import com.willfp.eco.internal.spigot.integrations.customblocks.CustomBlocksNexo
+import com.willfp.eco.internal.spigot.integrations.customentities.CustomEntitiesMythicMobs
+import com.willfp.eco.internal.spigot.integrations.customitems.CustomItemsCraftEngine
+import com.willfp.eco.internal.spigot.integrations.customitems.CustomItemsDenizen
+import com.willfp.eco.internal.spigot.integrations.customitems.CustomItemsHeadDatabase
+import com.willfp.eco.internal.spigot.integrations.customitems.CustomItemsItemBridge
+import com.willfp.eco.internal.spigot.integrations.customitems.CustomItemsItemsAdder
+import com.willfp.eco.internal.spigot.integrations.customitems.CustomItemsMythicMobs
+import com.willfp.eco.internal.spigot.integrations.customitems.CustomItemsNexo
+import com.willfp.eco.internal.spigot.integrations.customitems.CustomItemsScyther
+import com.willfp.eco.internal.spigot.integrations.economy.EconomyVault
+import com.willfp.eco.internal.spigot.integrations.entitylookup.EntityLookupModelEngine
+import com.willfp.eco.internal.spigot.integrations.hologram.HologramCMI
+import com.willfp.eco.internal.spigot.integrations.hologram.HologramDecentHolograms
+import com.willfp.eco.internal.spigot.integrations.hologram.HologramFancyHolograms
+import com.willfp.eco.internal.spigot.integrations.hologram.HologramHolographicDisplays
+import com.willfp.eco.internal.spigot.integrations.mcmmo.McmmoIntegrationImpl
+import com.willfp.eco.internal.spigot.integrations.placeholder.PlaceholderIntegrationPAPI
+import com.willfp.eco.internal.spigot.integrations.price.PriceFactoryCoinsEngine
+import com.willfp.eco.internal.spigot.integrations.price.PriceFactoryPlayerPoints
+import com.willfp.eco.internal.spigot.integrations.shop.ShopDeluxeSellwands
+import com.willfp.eco.internal.spigot.integrations.shop.ShopExcellentShop
+import com.willfp.eco.internal.spigot.metrics.PlayerflowHandler
+import com.willfp.eco.internal.spigot.proxies.FastItemStackFactoryProxy
+import com.willfp.eco.internal.spigot.proxies.PacketHandlerProxy
+import com.willfp.eco.internal.spigot.recipes.CraftingRecipeListener
+import com.willfp.eco.internal.spigot.recipes.StackedRecipeListener
+import com.willfp.eco.internal.spigot.recipes.listeners.ComplexInComplex
+import com.willfp.eco.internal.spigot.recipes.listeners.ComplexInVanilla
+import com.willfp.eco.internal.spigot.recipes.stackhandlers.ShapedCraftingRecipeStackHandler
+import com.willfp.eco.internal.spigot.recipes.stackhandlers.ShapelessCraftingRecipeStackHandler
+import com.willfp.eco.util.ClassUtils
+import net.kyori.adventure.platform.bukkit.BukkitAudiences
+import net.milkbowl.vault.economy.Economy
+import org.bukkit.Bukkit
+import org.bukkit.Material
+import org.bukkit.event.Listener
+import org.bukkit.inventory.ItemStack
+import su.nightexpress.excellenteconomy.api.ExcellentEconomyAPI
+
+abstract class EcoSpigotPlugin : EcoPlugin() {
+    abstract val dataYml: DataYml
+    abstract val profileHandler: ProfileHandler
+    protected var bukkitAudiences: BukkitAudiences? = null
+
+    init {
+        Items.registerArgParser(ArgParserEnchantment)
+        Items.registerArgParser(ArgParserColor)
+        Items.registerArgParser(ArgParserTexture)
+        Items.registerArgParser(ArgParserPotionBuilder)
+        Items.registerArgParser(ArgParserFireworkBuilder)
+        Items.registerArgParser(ArgParserFireworkPower)
+        Items.registerArgParser(ArgParserCustomModelData)
+        Items.registerArgParser(ArgParserFlag)
+        Items.registerArgParser(ArgParserUnbreakable)
+        Items.registerArgParser(ArgParserName)
+        Items.registerArgParser(ArgParserHead)
+        Items.registerArgParser(ArgParserEntity)
+        Items.registerArgParser(ArgParserFireResistant)
+        Items.registerArgParser(ArgParserGlider)
+        Items.registerArgParser(ArgParserGlint)
+        Items.registerArgParser(ArgParserItemModel)
+        Items.registerArgParser(ArgParserItemName)
+        Items.registerArgParser(ArgParserMaxDamage)
+        Items.registerArgParser(ArgParserMaxStackSize)
+        Items.registerArgParser(ArgParserTooltipStyle)
+        Items.registerArgParser(ArgParserTrim)
+        Items.registerArgParser(ArgParserAttribute)
+
+        Blocks.registerArgParser(BlockArgParserAgeable)
+        Blocks.registerArgParser(BlockArgParserAnaloguePowerable)
+        Blocks.registerArgParser(BlockArgParserAttachable)
+        Blocks.registerArgParser(BlockArgParserBamboo)
+        Blocks.registerArgParser(BlockArgParserBisected)
+        Blocks.registerArgParser(BlockArgParserBubbleColumn)
+        Blocks.registerArgParser(BlockArgParserCake)
+        Blocks.registerArgParser(BlockArgParserCampfire)
+        Blocks.registerArgParser(BlockArgParserCaveVinesPlant)
+        Blocks.registerArgParser(BlockArgParserChest)
+        Blocks.registerArgParser(BlockArgParserCommandBlock)
+        Blocks.registerArgParser(BlockArgParserComparator)
+        Blocks.registerArgParser(BlockArgParserCrafter)
+        Blocks.registerArgParser(BlockArgParserDaylightDetector)
+        Blocks.registerArgParser(BlockArgParserDirectional)
+        Blocks.registerArgParser(BlockArgParserDispenser)
+        Blocks.registerArgParser(BlockArgParserDoor)
+        Blocks.registerArgParser(BlockArgParserEndPortalFrame)
+        Blocks.registerArgParser(BlockArgParserFaceAttachable)
+        Blocks.registerArgParser(BlockArgParserFarmland)
+        Blocks.registerArgParser(BlockArgParserGate)
+        Blocks.registerArgParser(BlockArgParserHangable)
+        Blocks.registerArgParser(BlockArgParserHangingMoss)
+        Blocks.registerArgParser(BlockArgParserJigsaw)
+        Blocks.registerArgParser(BlockArgParserLevelled)
+        Blocks.registerArgParser(BlockArgParserLightable)
+        Blocks.registerArgParser(BlockArgParserMossyCarpet)
+        Blocks.registerArgParser(BlockArgParserMultipleFacing)
+        Blocks.registerArgParser(BlockArgParserNoteBlock)
+        Blocks.registerArgParser(BlockArgParserOpenable)
+        Blocks.registerArgParser(BlockArgParserOrientable)
+        Blocks.registerArgParser(BlockArgParserPointedDripstone)
+        Blocks.registerArgParser(BlockArgParserPowerable)
+        Blocks.registerArgParser(BlockArgParserQuantity)
+        Blocks.registerArgParser(BlockArgParserRail)
+        Blocks.registerArgParser(BlockArgParserRedstoneWire)
+        Blocks.registerArgParser(BlockArgParserRepeater)
+        Blocks.registerArgParser(BlockArgParserRespawnAnchor)
+        Blocks.registerArgParser(BlockArgParserRotatable)
+        Blocks.registerArgParser(BlockArgParserScaffolding)
+        Blocks.registerArgParser(BlockArgParserSculkSensor)
+        Blocks.registerArgParser(BlockArgParserSculkShrieker)
+        Blocks.registerArgParser(BlockArgParserSlab)
+        Blocks.registerArgParser(BlockArgParserSnow)
+        Blocks.registerArgParser(BlockArgParserSnowy)
+        Blocks.registerArgParser(BlockArgParserStairs)
+        Blocks.registerArgParser(BlockArgParserStructureBlock)
+        Blocks.registerArgParser(BlockArgParserTNT)
+        Blocks.registerArgParser(BlockArgParserTrial)
+        Blocks.registerArgParser(BlockArgParserTripwire)
+        Blocks.registerArgParser(BlockArgParserWall)
+        Blocks.registerArgParser(BlockArgParserWaterlogged)
+
+        Entities.registerArgParser(EntityArgParserName)
+        Entities.registerArgParser(EntityArgParserNoAI)
+        Entities.registerArgParser(EntityArgParserAttackDamage)
+        Entities.registerArgParser(EntityArgParserAttackSpeed)
+        Entities.registerArgParser(EntityArgParserFlySpeed)
+        Entities.registerArgParser(EntityArgParserFollowRange)
+        Entities.registerArgParser(EntityArgParserHealth)
+        Entities.registerArgParser(EntityArgParserKnockback)
+        Entities.registerArgParser(EntityArgParserKnockbackResistance)
+        Entities.registerArgParser(EntityArgParserSize)
+        Entities.registerArgParser(EntityArgParserSpawnReinforcements)
+        Entities.registerArgParser(EntityArgParserSpeed)
+        Entities.registerArgParser(EntityArgParserBaby)
+        Entities.registerArgParser(EntityArgParserAdult)
+        Entities.registerArgParser(EntityArgParserCharged)
+        Entities.registerArgParser(EntityArgParserExplosionRadius)
+        Entities.registerArgParser(EntityArgParserSilent)
+        Entities.registerArgParser(EntityArgParserEquipment)
+        Entities.registerArgParser(EntityArgParserJumpStrength)
+        Entities.registerArgParser(EntityArgParserScale)
+        Entities.registerArgParser(EntityArgParserFirework)
+
+        Prices.registerPriceFactory(PriceFactoryEconomy)
+        Prices.registerPriceFactory(PriceFactoryXPLevels)
+        Prices.registerPriceFactory(PriceFactoryXP)
+
+        Particles.registerParticleFactory(ParticleFactoryRGB)
+
+        CraftingRecipeListener.registerListener(ComplexInComplex)
+        CraftingRecipeListener.registerListener(ComplexInVanilla)
+
+        StackedRecipeListener.registerHandler(ShapedCraftingRecipeStackHandler)
+        StackedRecipeListener.registerHandler(ShapelessCraftingRecipeStackHandler)
+
+        SegmentParserGroup.register()
+        SegmentParserUseIfPresent.register()
+
+        CustomItemsManager.registerProviders()
+        CustomBlocksManager.registerProviders()
+
+        ExternalDataStore.registerAdapter(VersionToStringAdapter)
+        // Handle with shadow.
+        val className = listOf(
+            "org",
+            "apache",
+            "maven",
+            "artifact",
+            "versioning",
+            "DefaultArtifactVersion"
+        ).joinToString(".")
+        if (ClassUtils.exists(className)) {
+            ExternalDataStore.registerAdapter(MavenVersionToStringAdapter(className))
+        }
+    }
+
+    override fun handleEnable() {
+        this.logger.info("Scanning for conflicts...")
+        val conflicts = ConflictFinder.searchForConflicts(this)
+        for (conflict in conflicts) {
+            this.logger.warning(conflict.conflictMessage)
+        }
+        if (conflicts.isNotEmpty()) {
+            this.logger.warning(
+                "You can fix the conflicts by either removing the conflicting plugins, " +
+                        "or by asking on the support discord to have them patched!"
+            )
+            this.logger.warning(
+                "Only remove potentially conflicting plugins if you see " +
+                        "Loader Constraint Violation / LinkageError anywhere"
+            )
+        } else {
+            this.logger.info("No conflicts found!")
+        }
+
+        // Do it again here
+        CustomItemsManager.registerProviders()
+        CustomBlocksManager.registerProviders()
+
+        // Register events for ShopSellEvent
+        for (integration in ShopManager.getRegisteredIntegrations()) {
+            val listener = integration.sellEventAdapter
+            if (listener != null) {
+                this.eventManager.registerListener(listener)
+            }
+        }
+
+        // Init FIS
+        this.getProxy(FastItemStackFactoryProxy::class.java).create(ItemStack(Material.AIR)).unwrap()
+
+        // Init adventure
+        if (!Prerequisite.HAS_PAPER.isMet) {
+            bukkitAudiences = BukkitAudiences.create(this)
+        }
+
+        // Init vanilla tags
+        VanillaItemTags.register()
+        VanillaBlockTags.register()
+    }
+
+    override fun handleDisable() {
+        this.logger.info("Saving player data...")
+        val start = System.currentTimeMillis()
+        profileHandler.save()
+        this.logger.info("Saved player data! Took ${System.currentTimeMillis() - start}ms")
+        Eco.get().adventure?.close()
+    }
+
+    override fun createTasks() {
+        CollatedRunnable(this)
+
+        if (!profileHandler.migrateIfNecessary()) {
+            profileHandler.profileWriter.startTickingAutosave()
+            profileHandler.profileWriter.startTickingSaves()
+        }
+
+        this.scheduler.runTaskTimer(
+            this.configYml.getInt("display-frame-ttl").toLong(),
+            this.configYml.getInt("display-frame-ttl").toLong(),
+        ) { getProxy(PacketHandlerProxy::class.java).clearDisplayFrames() }
+
+        if (this.configYml.getBool("playerflow")) {
+            PlayerflowHandler(this.scheduler).startTicking()
+        }
+
+        this.scheduler.runTaskTimer(1L, 20L) {
+            Recipes.checkBatching()
+        }
+    }
+
+    override fun handleAfterLoad() {
+        CustomItemsManager.registerAllItems()
+        CustomBlocksManager.registerAllBlocks()
+        CustomEntitiesManager.registerAllEntities()
+        ShopManager.registerEcoProvider()
+    }
+
+    override fun loadIntegrationLoaders(): List<IntegrationLoader> {
+        return listOf(
+            // 本地维护版暂不编译缺少私有/闭源 API 的可选集成。
+            // AntiGrief
+            IntegrationLoader("IridiumSkyblock") { AntigriefManager.register(AntigriefIridiumSkyblock()) },
+            IntegrationLoader("DeluxeCombat") { AntigriefManager.register(AntigriefDeluxeCombat()) },
+            IntegrationLoader("SuperiorSkyblock2") { AntigriefManager.register(AntigriefSuperiorSkyblock2()) },
+            IntegrationLoader("BentoBox") { AntigriefManager.register(AntigriefBentoBox()) },
+            IntegrationLoader("WorldGuard") { AntigriefManager.register(AntigriefWorldGuard()) },
+            IntegrationLoader("GriefPrevention") { AntigriefManager.register(AntigriefGriefPrevention()) },
+            IntegrationLoader("FactionsUUID") { AntigriefManager.register(AntigriefFactionsUUID()) },
+            IntegrationLoader("Towny") { AntigriefManager.register(AntigriefTowny()) },
+            IntegrationLoader("HuskTowns") { AntigriefManager.register(AntigriefHuskTowns()) },
+            IntegrationLoader("HuskClaims") { AntigriefManager.register(AntigriefHuskClaims()) },
+            IntegrationLoader("FabledSkyblock") { AntigriefManager.register(AntigriefFabledSkyBlock()) },
+
+            // Anticheat
+            // Custom Entities
+            IntegrationLoader("MythicMobs") { CustomEntitiesManager.register(CustomEntitiesMythicMobs()) },
+
+            // Custom Items
+            IntegrationLoader("Nexo") {
+                CustomItemsManager.register(CustomItemsNexo(this))
+                CustomBlocksManager.register(CustomBlocksNexo(this))
+            },
+            IntegrationLoader("ItemsAdder") {
+                CustomItemsManager.register(CustomItemsItemsAdder())
+                CustomBlocksManager.register(CustomBlocksItemsAdder())
+            },
+            IntegrationLoader("CraftEngine") {
+                CustomItemsManager.register(CustomItemsCraftEngine(this))
+                CustomBlocksManager.register(CustomBlocksCraftEngine(this))
+            },
+            IntegrationLoader("HeadDatabase") { CustomItemsManager.register(CustomItemsHeadDatabase(this)) },
+            IntegrationLoader("MythicMobs") { CustomItemsManager.register(CustomItemsMythicMobs(this)) },
+            IntegrationLoader("Scyther") { CustomItemsManager.register(CustomItemsScyther()) },
+            IntegrationLoader("Denizen") { CustomItemsManager.register(CustomItemsDenizen()) },
+            IntegrationLoader("ItemBridge") { CustomItemsManager.register(CustomItemsItemBridge()) },
+
+            // Shop
+            IntegrationLoader("DeluxeSellwands") { ShopManager.register(ShopDeluxeSellwands()) },
+            IntegrationLoader("ExcellentShop") { ShopManager.register(ShopExcellentShop()) },
+
+            // Hologram
+            IntegrationLoader("HolographicDisplays") { HologramManager.register(HologramHolographicDisplays(this)) },
+            IntegrationLoader("CMI") { HologramManager.register(HologramCMI()) },
+            IntegrationLoader("DecentHolograms") { HologramManager.register(HologramDecentHolograms()) },
+            //IntegrationLoader("GHolo") { HologramManager.register(HologramGHolo()) },
+            IntegrationLoader("FancyHolograms") { HologramManager.register(HologramFancyHolograms()) },
+
+            // AFK
+            IntegrationLoader("Essentials") { AFKManager.register(AFKIntegrationEssentials()) },
+            IntegrationLoader("CMI") { AFKManager.register(AFKIntegrationCMI()) },
+
+            // Economy
+            IntegrationLoader("Vault") {
+                val rsp = Bukkit.getServer().servicesManager.getRegistration(Economy::class.java)
+                if (rsp != null) {
+                    EconomyManager.register(EconomyVault(rsp.provider))
+                }
+            },
+
+            // Price
+            IntegrationLoader("PlayerPoints") { Prices.registerPriceFactory(PriceFactoryPlayerPoints()) },
+            IntegrationLoader("CoinsEngine") {
+                val rsp = Bukkit.getServer().servicesManager.getRegistration(ExcellentEconomyAPI::class.java)
+                if (rsp != null) {
+                    val api = rsp.provider
+                    for (currency in api.currencies) {
+                        Prices.registerPriceFactory(PriceFactoryCoinsEngine(api, currency))
+                    }
+                }
+            },
+
+            // Placeholder
+            IntegrationLoader("PlaceholderAPI") { PlaceholderManager.addIntegration(PlaceholderIntegrationPAPI()) },
+
+            // Misc
+            IntegrationLoader("mcMMO") { McmmoManager.register(McmmoIntegrationImpl()) },
+            IntegrationLoader("ModelEngine") { EntityLookupModelEngine.register() }
+        )
+    }
+
+    override fun loadListeners(): List<Listener> {
+        val listeners = mutableListOf(
+            ArmorListener(),
+            EntityDeathByEntityListeners(this),
+            CraftingRecipeListener(this),
+            StackedRecipeListener(this),
+            GUIListener(this),
+            ArrowDataListener(this),
+            ArmorChangeEventListeners(this),
+            ProfileLoadListener(this, profileHandler),
+            PlayerBlockListener(this),
+            ServerLocking,
+            AutocrafterPatch,
+            PlayerHealthPatch
+        )
+
+        if (Prerequisite.HAS_PAPER.isMet) {
+            listeners.add(PlayerJumpListenersPaper())
+            listeners.add(NaturalExpGainListenersPaper())
+        } else {
+            listeners.add(PlayerJumpListenersSpigot())
+            listeners.add(NaturalExpGainListenersSpigot())
+        }
+
+        return listeners
+    }
+
+    override fun loadPacketListeners(): List<PacketListener> {
+        return this.getProxy(PacketHandlerProxy::class.java).getPacketListeners(this)
+    }
+}

@@ -1,0 +1,175 @@
+package com.willfp.eco.core.price.impl;
+
+import com.willfp.eco.core.drops.DropQueue;
+import com.willfp.eco.core.items.HashedItem;
+import com.willfp.eco.core.items.TestableItem;
+import com.willfp.eco.core.placeholder.context.PlaceholderContext;
+import com.willfp.eco.core.placeholder.context.PlaceholderContextSupplier;
+import com.willfp.eco.core.price.Price;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * Item-based price.
+ */
+public final class PriceItem implements Price {
+    /**
+     * The base PlaceholderContext.
+     */
+    private final PlaceholderContext baseContext;
+
+    /**
+     * The amount of items.
+     */
+    private final PlaceholderContextSupplier<Double> function;
+
+    /**
+     * The item.
+     */
+    private final TestableItem item;
+
+    /**
+     * The multipliers.
+     */
+    private final Map<UUID, Double> multipliers = new HashMap<>();
+
+    /**
+     * Create a new item-based price.
+     *
+     * @param amount The amount.
+     * @param item   The item.
+     */
+    public PriceItem(final int amount,
+                     @NotNull final TestableItem item) {
+        this(PlaceholderContext.EMPTY, (PlaceholderContext ctx) -> (double) amount, item);
+    }
+
+    /**
+     * Create a new item-based price.
+     *
+     * @param baseContext The base MathContext.
+     * @param function    The function to get the amount of items to remove.
+     * @param item        The item.
+     * @deprecated Use {@link #PriceItem(PlaceholderContext, PlaceholderContextSupplier, TestableItem)} instead.
+     */
+    @Deprecated(since = "6.56.0", forRemoval = true)
+    @SuppressWarnings("removal")
+    public PriceItem(@NotNull final com.willfp.eco.core.math.MathContext baseContext,
+                     @NotNull final Function<com.willfp.eco.core.math.MathContext, Double> function,
+                     @NotNull final TestableItem item) {
+        this(baseContext.toPlaceholderContext(), (PlaceholderContext ctx) -> function.apply(ctx.toMathContext()), item);
+    }
+
+    /**
+     * Create a new item-based price.
+     *
+     * @param baseContext The base MathContext.
+     * @param function    The function to get the amount of items to remove.
+     * @param item        The item.
+     */
+    public PriceItem(@NotNull final PlaceholderContext baseContext,
+                     @NotNull final PlaceholderContextSupplier<Double> function,
+                     @NotNull final TestableItem item) {
+        this.baseContext = baseContext;
+        this.function = function;
+        this.item = item;
+    }
+
+    /**
+     * Get the item.
+     *
+     * @return The item.
+     */
+    public TestableItem getItem() {
+        return item;
+    }
+
+    @Override
+    public boolean canAfford(@NotNull final Player player,
+                             final double multiplier) {
+        int toRemove = (int) getValue(player, multiplier);
+        if (toRemove <= 0) {
+            return true;
+        }
+
+        int count = 0;
+
+        for (ItemStack itemStack : player.getInventory().getContents()) {
+            if (item.matches(itemStack)) {
+                count += itemStack.getAmount();
+            }
+        }
+
+        return count >= toRemove;
+    }
+
+    @Override
+    public void pay(@NotNull final Player player,
+                    final double multiplier) {
+        int toRemove = (int) getValue(player, multiplier);
+        int count = 0;
+
+        for (ItemStack itemStack : player.getInventory().getContents()) {
+            if (count >= toRemove) {
+                break;
+            }
+
+            if (item.matches(itemStack)) {
+                int itemAmount = itemStack.getAmount();
+                int remaining = toRemove - count;
+
+                if (itemAmount > remaining) {
+                    itemStack.setAmount(itemAmount - remaining);
+                } else {
+                    itemStack.setAmount(0);
+                    itemStack.setType(Material.AIR);
+                }
+
+                count += itemAmount;
+            }
+        }
+    }
+
+    @Override
+    public void giveTo(@NotNull final Player player,
+                       final double multiplier) {
+        ItemStack itemStack = item.getItem().clone();
+        itemStack.setAmount((int) getValue(player, multiplier));
+
+        new DropQueue(player)
+                .addItem(itemStack)
+                .forceTelekinesis()
+                .push();
+    }
+
+    @Override
+    public double getValue(@NotNull final Player player,
+                           final double multiplier) {
+        return Math.toIntExact(Math.round(
+                this.function.get(baseContext.copyWithPlayer(player))
+                        * getMultiplier(player) * multiplier
+        ));
+    }
+
+    @Override
+    public double getMultiplier(@NotNull final Player player) {
+        return this.multipliers.getOrDefault(player.getUniqueId(), 1.0);
+    }
+
+    @Override
+    public void setMultiplier(@NotNull final Player player,
+                              final double multiplier) {
+        this.multipliers.put(player.getUniqueId(), multiplier);
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "eco:item-" + HashedItem.of(this.item.getItem()).getHash();
+    }
+}

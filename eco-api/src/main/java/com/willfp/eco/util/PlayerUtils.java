@@ -1,0 +1,293 @@
+package com.willfp.eco.util;
+
+import com.willfp.eco.core.Eco;
+import com.willfp.eco.core.Prerequisite;
+import com.willfp.eco.core.data.PlayerProfile;
+import com.willfp.eco.core.data.keys.PersistentDataKey;
+import com.willfp.eco.core.data.keys.PersistentDataKeyType;
+import com.willfp.eco.core.integrations.anticheat.AnticheatManager;
+import java.util.function.Consumer;
+import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.platform.bukkit.BukkitAudiences;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.block.BlockFace;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.*;
+import org.bukkit.projectiles.ProjectileSource;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * Utilities / API methods for players.
+ */
+public final class PlayerUtils {
+    /**
+     * The data key for saved player names.
+     */
+    private static final PersistentDataKey<String> PLAYER_NAME_KEY = new PersistentDataKey<>(
+            NamespacedKeyUtils.createEcoKey("player_name"),
+            PersistentDataKeyType.STRING,
+            "Unknown Player"
+    );
+
+    /**
+     * The data key for saved player display names.
+     */
+    private static final PersistentDataKey<String> PLAYER_DISPLAY_NAME_KEY = new PersistentDataKey<>(
+            NamespacedKeyUtils.createEcoKey("player_display_name"),
+            PersistentDataKeyType.STRING,
+            "Unknown Player"
+    );
+
+    /**
+     * The data key for saved player health.
+     */
+    private static final PersistentDataKey<Double> PLAYER_HEALTH_KEY = new PersistentDataKey<>(
+            NamespacedKeyUtils.createEcoKey("player_health"),
+            PersistentDataKeyType.DOUBLE,
+            20.0
+    );
+
+    /**
+     * Get the audience from a player.
+     *
+     * @param player The player.
+     * @return The audience.
+     */
+    @NotNull
+    public static Audience getAudience(@NotNull final Player player) {
+        BukkitAudiences adventure = Eco.get().getAdventure();
+
+        if (Prerequisite.HAS_PAPER.isMet()) {
+            if (player instanceof Audience) {
+                return (Audience) player;
+            } else {
+                return Audience.empty();
+            }
+        } else {
+            if (adventure == null) {
+                return Audience.empty();
+            } else {
+                return adventure.player(player);
+            }
+        }
+    }
+
+    /**
+     * Get the audience from a command sender.
+     *
+     * @param sender The command sender.
+     * @return The audience.
+     */
+    @NotNull
+    public static Audience getAudience(@NotNull final CommandSender sender) {
+        BukkitAudiences adventure = Eco.get().getAdventure();
+
+        if (Prerequisite.HAS_PAPER.isMet()) {
+            if (sender instanceof Audience) {
+                return (Audience) sender;
+            } else {
+                return Audience.empty();
+            }
+        } else {
+            if (adventure == null) {
+                return Audience.empty();
+            } else {
+                return adventure.sender(sender);
+            }
+        }
+    }
+
+    /**
+     * Get saved display name for an offline player.
+     *
+     * @param player The player.
+     * @return The player name.
+     */
+    public static String getSavedDisplayName(@NotNull final OfflinePlayer player) {
+        if (player instanceof Player onlinePlayer) {
+            updateSavedDisplayName(onlinePlayer);
+        }
+
+        PlayerProfile profile = PlayerProfile.load(player);
+
+        String saved = profile.read(PLAYER_DISPLAY_NAME_KEY);
+
+        if (saved.equals(PLAYER_DISPLAY_NAME_KEY.getDefaultValue())) {
+            return player.getName();
+        }
+
+        return saved;
+    }
+
+    /**
+     * Update the saved display name for a player.
+     *
+     * @param player The player.
+     */
+    public static void updateSavedDisplayName(@NotNull final Player player) {
+        PlayerProfile profile = PlayerProfile.load(player);
+        profile.write(PLAYER_DISPLAY_NAME_KEY, player.getDisplayName());
+    }
+
+    /**
+     * Get the saved name for an offline player.
+     *
+     * @param player The player.
+     * @return The player name.
+     */
+    public static String getSavedName(@NotNull final OfflinePlayer player) {
+        if (player instanceof Player onlinePlayer) {
+            updateSavedName(onlinePlayer);
+        }
+
+        PlayerProfile profile = PlayerProfile.load(player);
+
+        String saved = profile.read(PLAYER_NAME_KEY);
+
+        if (saved.equals(PLAYER_NAME_KEY.getDefaultValue())) {
+            return player.getName();
+        }
+
+        return saved;
+    }
+
+    /**
+     * Update the saved name for a player.
+     *
+     * @param player The player.
+     */
+    public static void updateSavedName(@NotNull final Player player) {
+        PlayerProfile profile = PlayerProfile.load(player);
+        profile.write(PLAYER_NAME_KEY, player.getName());
+    }
+
+    /**
+     * Get the saved health for an offline player.
+     *
+     * @param player The player.
+     * @return The player health.
+     */
+    public static double getSavedHealth(@NotNull final OfflinePlayer player) {
+        PlayerProfile profile = PlayerProfile.load(player);
+
+        return profile.read(PLAYER_HEALTH_KEY);
+    }
+
+    /**
+     * Update the saved health for a player.
+     *
+     * @param player The player.
+     */
+    public static void saveHealth(@NotNull final Player player) {
+        PlayerProfile profile = PlayerProfile.load(player);
+        profile.write(PLAYER_HEALTH_KEY, player.getHealth());
+    }
+
+    /**
+     * Run something with the player exempted.
+     *
+     * @param player The player.
+     * @param action The action.
+     */
+    public static void runExempted(@NotNull final Player player,
+                                   @NotNull final Consumer<Player> action) {
+        try {
+            AnticheatManager.exemptPlayer(player);
+            action.accept(player);
+        } finally {
+            AnticheatManager.unexemptPlayer(player);
+        }
+    }
+
+    /**
+     * Run something with the player exempted.
+     *
+     * @param player The player.
+     * @param action The action.
+     */
+    public static void runExempted(@NotNull final Player player,
+                                   @NotNull final Runnable action) {
+        try {
+            AnticheatManager.exemptPlayer(player);
+            action.run();
+        } finally {
+            AnticheatManager.unexemptPlayer(player);
+        }
+    }
+
+    /**
+     * Try an entity as a player.
+     *
+     * @param entity The entity.
+     * @return The player, or null if no player could be found.
+     */
+    @Nullable
+    public static Player tryAsPlayer(@Nullable final Entity entity) {
+        if (entity == null) {
+            return null;
+        }
+
+        if (entity instanceof Player player) {
+            return player;
+        }
+
+        if (entity instanceof Projectile projectile) {
+            ProjectileSource shooter = projectile.getShooter();
+            if (shooter instanceof Player player) {
+                return player;
+            }
+        }
+
+        if (entity instanceof Tameable tameable) {
+            AnimalTamer tamer = tameable.getOwner();
+            if (tamer instanceof Player player) {
+                return player;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Gives the player the amount of experience specified.
+     *
+     * @param player       The player.
+     * @param amount       The amount.
+     * @param applyMending Mend players items with mending, with same behavior as picking up orbs.
+     */
+    public static void giveExpAndApplyMending(@NotNull Player player, int amount, boolean applyMending) {
+        Eco.get().giveExpAndApplyMending(player, amount, applyMending);
+    }
+
+    /**
+     * Gets all 6 directions a player might be looking.
+     *
+     * @param player The player.
+     * @return The direction a player is facing.
+     */
+    public static BlockFace getDirection(Player player) {
+        float pitch = player.getLocation().getPitch();
+        float yaw = player.getLocation().getYaw();
+
+        if (pitch < -45) {
+            return BlockFace.UP;
+        } else if (pitch > 45) {
+            return BlockFace.DOWN;
+        }
+
+        double rotation = (yaw - 90) % 360;
+        if (rotation < 0) rotation += 360;
+
+        if (0 <= rotation && rotation < 45) return BlockFace.WEST;
+        if (45 <= rotation && rotation < 135) return BlockFace.NORTH;
+        if (135 <= rotation && rotation < 225) return BlockFace.EAST;
+        if (225 <= rotation && rotation < 315) return BlockFace.SOUTH;
+
+        return BlockFace.EAST;
+    }
+
+    private PlayerUtils() {
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+    }
+}
