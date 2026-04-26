@@ -27,8 +27,10 @@ class CustomItemsCraftEngine(
     }
 
     @EventHandler
-    @Suppress("UNUSED_PARAMETER")
     fun onItemRegister(event: CraftEngineReloadEvent) {
+        if (!event.isFirstReload) {
+            return
+        }
         Items.registerItemProvider(CraftEngineProvider())
     }
 

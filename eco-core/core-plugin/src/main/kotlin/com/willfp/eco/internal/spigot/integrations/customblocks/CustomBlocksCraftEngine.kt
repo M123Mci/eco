@@ -27,8 +27,10 @@ class CustomBlocksCraftEngine(
     }
 
     @EventHandler
-    @Suppress("UNUSED_PARAMETER")
     fun onBlockRegister(event: CraftEngineReloadEvent) {
+        if (!event.isFirstReload) {
+            return
+        }
         Blocks.registerBlockProvider(CraftEngineProvider())
     }
 
