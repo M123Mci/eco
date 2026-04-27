@@ -66,7 +66,7 @@ dependencies {
     }
     compileOnly("com.github.decentsoftware-eu:decentholograms:2.9.9")
     compileOnly("com.github.N0RSKA:ScytherAPI:55a")
-    compileOnly("org.black_ixx:playerpoints:3.2.6")
+    compileOnly("org.black_ixx:playerpoints:3.3.3")
     compileOnly("io.lumine:Mythic:5.11.1")
     compileOnly("io.lumine:LumineUtils:1.21-SNAPSHOT")
     compileOnly("com.github.sirblobman.api:core:2.9-SNAPSHOT")
