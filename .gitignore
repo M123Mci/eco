@@ -19,6 +19,10 @@ bin/
 .gradletasknamecache
 !gradle-wrapper.jar
 gradle-app.setting
+jars/
+lib/
+.sync/
+.narrafork/
 
 # Mac OSX
 .DS_Store

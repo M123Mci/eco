@@ -15,12 +15,6 @@ java {
     withJavadocJar()
 }
 
-tasks {
-    build {
-        dependsOn(publishToMavenLocal)
-    }
-}
-
 publishing {
     publications {
         create<MavenPublication>("shadow") {

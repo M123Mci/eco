@@ -1,6 +1,20 @@
 group = "com.willfp"
 version = rootProject.version
 val craftEngineVersion = "0.0.67.11"
+val externalPluginLibDir = rootProject.extra["externalPluginLibDir"].toString()
+val externalPluginJars = listOf(
+    "BentoBox-1.20.0.jar",
+    "CMIAPI8.7.8.2.jar",
+    "CMILib1.0.4.1.jar",
+    "DeluxeCombat API.jar",
+    "DeluxeMenus-1.13.7-DEV-156.jar",
+    "DeluxeSellwands Build 22e.jar",
+    "FabledSkyBlock-4.2.2.jar",
+    "FactionsUUID.jar",
+    "GHolo.jar",
+    "GriefPrevention.jar",
+    "KingdomsX-1.16.9.jar",
+)
 
 dependencies {
     compileOnly(project(":eco-core:core-backend"))
@@ -70,8 +84,8 @@ dependencies {
     compileOnly("su.nightexpress.nightcore:main:2.14.1")
     compileOnly("su.nightexpress.excellentshop:Core:4.22.0")
 
-    compileOnly(fileTree("../../lib") {
-        include("*.jar")
+    compileOnly(fileTree(externalPluginLibDir) {
+        include(externalPluginJars)
     })
 }
 

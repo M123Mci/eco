@@ -18,6 +18,19 @@ plugins {
     kotlin("jvm") version "2.3.0"
 }
 
+fun configuredPath(value: String?): String? = value?.trim()?.takeIf { it.isNotEmpty() }
+
+val localPluginRepoDir = configuredPath(providers.gradleProperty("localPluginRepoDir").orNull)
+    ?: configuredPath(providers.gradleProperty("local_maven_repo_path").orNull)
+    ?: configuredPath(System.getenv("LOCAL_PLUGIN_REPO_DIR"))
+    ?: "C:/PluginLibs/Maven"
+val externalPluginLibDir = configuredPath(providers.gradleProperty("externalPluginLibDir").orNull)
+    ?: configuredPath(System.getenv("EXTERNAL_PLUGIN_LIB_DIR"))
+    ?: "C:/PluginLibs"
+
+extra["resolvedLocalPluginRepoDir"] = localPluginRepoDir
+extra["externalPluginLibDir"] = externalPluginLibDir
+
 dependencies {
     implementation(project(":eco-api"))
     implementation(project(path = ":eco-core:core-plugin", configuration = "shadow"))
@@ -40,6 +53,10 @@ allprojects {
     apply(plugin = "kotlin")
 
     repositories {
+        maven {
+            name = "localPluginRepo"
+            url = uri(file(localPluginRepoDir))
+        }
         mavenCentral()
 
         maven("https://repo.auxilor.io/repository/maven-public/")
@@ -205,7 +222,6 @@ allprojects {
 
 tasks {
     shadowJar {
-        destinationDirectory.set(layout.projectDirectory.dir("jars"))
         exclude("META-INF/**")
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
@@ -245,3 +261,18 @@ tasks {
 
 group = "com.willfp"
 version = findProperty("version")!!
+
+extra["unifiedPluginConfig"] = mapOf(
+    "artifacts" to listOf(
+        mapOf(
+            "projectPath" to ":",
+            "taskName" to "shadowJar",
+            "fileName" to "eco.jar",
+            "groupId" to project.group.toString(),
+            "artifactId" to "eco",
+            "publishToMaven" to true,
+        ),
+    ),
+)
+
+apply(from = rootProject.file("gradle/unified-plugin-conventions.gradle"))
