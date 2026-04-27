@@ -143,8 +143,8 @@ allprojects {
         compileOnly("com.google.guava:guava:32.0.0-jre")
 
         // Test
-        testImplementation("org.junit.jupiter:junit-jupiter-api:6.0.2")
-        testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.0.2")
+        testImplementation("org.junit.jupiter:junit-jupiter-api:6.0.3")
+        testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.0.3")
 
         // Adventure
         implementation("net.kyori:adventure-api:4.26.1") {
