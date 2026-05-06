@@ -1,7 +1,7 @@
 group = "com.willfp"
 version = rootProject.version
-val craftEngineVersion = "0.0.67.11"
 val externalPluginLibDir = rootProject.extra["externalPluginLibDir"].toString()
+val craftEngineApiJar = file("$externalPluginLibDir/craft-engine-paper-plugin-26.4-SNAPSHOT.jar")
 val externalPluginJars = listOf(
     "BentoBox-1.20.0.jar",
     "CMIAPI8.7.8.2.jar",
@@ -53,8 +53,7 @@ dependencies {
     compileOnly("com.nexomc:nexo:1.19.1") {
         exclude(group = "*", module = "*")
     }
-    compileOnly("net.momirealms:craft-engine-core:$craftEngineVersion")
-    compileOnly("net.momirealms:craft-engine-bukkit:$craftEngineVersion")
+    compileOnly(files(craftEngineApiJar))
     compileOnly("com.arcaniax:HeadDatabase-API:1.3.2")
     compileOnly("com.gmail.filoghost.holographicdisplays:holographicdisplays-api:2.4.0")
     compileOnly("net.essentialsx:EssentialsX:2.21.2") {
