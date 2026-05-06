@@ -48,7 +48,7 @@ dependencies {
         exclude(group = "com.zaxxer", module = "HikariCP")
     }
     compileOnly("com.gmail.nossr50.mcMMO:mcMMO:2.2.049")
-    compileOnly("me.clip:placeholderapi:2.11.7")
+    compileOnly("me.clip:placeholderapi:2.12.2")
     compileOnly("com.github.LoneDev6:API-ItemsAdder:2.4.7")
     compileOnly("com.nexomc:nexo:1.19.1") {
         exclude(group = "*", module = "*")
