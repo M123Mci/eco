@@ -140,7 +140,7 @@ allprojects {
 
         // Included in spigot jar, no need to move to implementation
         compileOnly("org.jetbrains:annotations:26.0.2")
-        compileOnly("com.google.guava:guava:32.0.0-jre")
+        compileOnly("com.google.guava:guava:33.7.1-jre")
 
         // Test
         testImplementation("org.junit.jupiter:junit-jupiter-api:6.0.2")
