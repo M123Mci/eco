@@ -35,7 +35,7 @@ dependencies {
     implementation("com.willfp:ModelEngineBridge:1.3.0")
 
     // Included in spigot jar
-    compileOnly("com.google.code.gson:gson:2.8.8")
+    compileOnly("com.google.code.gson:gson:2.14.0")
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
 
     // Plugin dependencies
