@@ -45,7 +45,7 @@ dependencies {
         exclude(group = "*", module = "*")
     }
     compileOnly("com.bgsoftware:SuperiorSkyblockAPI:2025.2.1")
-    compileOnly("com.github.MilkBowl:VaultAPI:1.7") {
+    compileOnly("com.github.MilkBowl:VaultAPI:1.7.1") {
         exclude(group = "*", module = "*")
     }
     compileOnly("com.github.N0RSKA:ScytherAPI:55a")
