@@ -117,9 +117,9 @@ allprojects {
         implementation(kotlin("stdlib", "2.3.21"))
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
         compileOnly("org.jetbrains:annotations:26.1.0")
-        compileOnly("net.kyori:adventure-api:5.0.1")
-        compileOnly("net.kyori:adventure-text-serializer-gson:5.0.1")
-        compileOnly("net.kyori:adventure-text-serializer-legacy:5.0.1")
+        compileOnly("net.kyori:adventure-api:5.2.0")
+        compileOnly("net.kyori:adventure-text-serializer-gson:5.2.0")
+        compileOnly("net.kyori:adventure-text-serializer-legacy:5.2.0")
         implementation("com.github.ben-manes.caffeine:caffeine:3.2.3")
     }
     java {
