@@ -1,6 +1,8 @@
 package com.willfp.eco.core.integrations.antigrief;
 
 import com.willfp.eco.core.integrations.IntegrationRegistry;
+import java.util.HashSet;
+import java.util.Set;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.entity.LivingEntity;
@@ -9,6 +11,10 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Class to handle antigrief integrations.
+ * <p>
+ * Every check requires <em>all</em> registered integrations to allow the action, so if any one
+ * integration denies it, the check fails. If no {@link AntigriefIntegration} is registered,
+ * every check returns true.
  */
 public final class AntigriefManager {
     /**
@@ -92,6 +98,15 @@ public final class AntigriefManager {
     public static boolean canInjure(@NotNull final Player player,
                                     @NotNull final LivingEntity victim) {
         return REGISTRY.allSafely(integration -> integration.canInjure(player, victim));
+    }
+
+    /**
+     * Get all registered antigrief integrations.
+     *
+     * @return The integrations.
+     */
+    public static Set<AntigriefIntegration> getRegisteredIntegrations() {
+        return new HashSet<>(REGISTRY.values());
     }
 
     private AntigriefManager() {

@@ -1,0 +1,43 @@
+package com.willfp.eco.internal.spigot.proxy.v26_2.common.packet.display.frame
+
+import com.willfp.eco.core.items.HashedItem
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import org.bukkit.entity.Player
+import org.bukkit.inventory.ItemStack
+
+data class DisplayFrame(val items: Map<Byte, HashedItem>) {
+    fun getItem(slot: Byte): ItemStack? {
+        return items[slot]?.item
+    }
+
+    /**
+     * The hash of the item the cached item for this slot was made from, or null if the slot
+     * wasn't in this frame.
+     */
+    fun getHash(slot: Byte): Int? {
+        return items[slot]?.hash
+    }
+
+    companion object {
+        val EMPTY = DisplayFrame(emptyMap())
+    }
+}
+
+private val frames = ConcurrentHashMap<UUID, DisplayFrame>()
+
+var Player.lastDisplayFrame: DisplayFrame
+    get() {
+        return frames[this.uniqueId] ?: DisplayFrame.EMPTY
+    }
+    set(value) {
+        frames[this.uniqueId] = value
+    }
+
+fun clearFrames() {
+    frames.clear()
+}
+
+fun clearFrame(playerId: UUID) {
+    frames.remove(playerId)
+}

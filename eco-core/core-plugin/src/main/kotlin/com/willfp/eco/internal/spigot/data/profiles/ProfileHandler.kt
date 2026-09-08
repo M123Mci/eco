@@ -31,6 +31,7 @@ class ProfileHandler(
     val profileWriter = ProfileWriter(plugin, this)
 
     private val loaded = ConcurrentHashMap<UUID, EcoProfile>()
+    private val resolvedProfiles = ConcurrentHashMap<UUID, MutableSet<UUID>>()
 
     fun getPlayerProfile(uuid: UUID): EcoPlayerProfile {
         return loaded.computeIfAbsent(uuid) {
@@ -48,9 +49,36 @@ class ProfileHandler(
         loaded.remove(uuid)
     }
 
+    /**
+     * Record that a player's data resolved to [profile], so it can be unloaded when they leave.
+     *
+     * A player can resolve to several profiles over a session, and only the last one is reachable
+     * through the resolver by the time they quit - so the rest have to be remembered here or they
+     * stay in [loaded] for the lifetime of the server.
+     */
+    fun trackResolvedProfile(player: UUID, profile: UUID) {
+        if (player == profile) {
+            return
+        }
+
+        resolvedProfiles.computeIfAbsent(player) { ConcurrentHashMap.newKeySet() }.add(profile)
+    }
+
+    /**
+     * Unload a player's own profile along with every profile they resolved to.
+     */
+    fun unloadPlayer(player: UUID) {
+        loaded.remove(player)
+        resolvedProfiles.remove(player)?.forEach { loaded.remove(it) }
+    }
+
     fun save() {
-        localHandler.shutdown()
-        defaultHandler.shutdown()
+        profileWriter.flush()
+        try {
+            localHandler.shutdown()
+        } finally {
+            defaultHandler.shutdown()
+        }
     }
 
     fun migrateIfNecessary(): Boolean {
@@ -95,7 +123,7 @@ class ProfileHandler(
         ServerLocking.lock("Migrating player data! Check console for more information.")
 
         // Run after 5 ticks to allow plugins to load their data keys
-        plugin.scheduler.runTaskLater(5) {
+        plugin.scheduler.global().runLater(5) {
             doMigrate(fromFactory)
 
             plugin.dataYml.set(LEGACY_MIGRATED_KEY, true)
@@ -122,17 +150,21 @@ class ProfileHandler(
 
         plugin.logger.info("Found ${uuids.size} profiles to migrate")
 
-        for ((index, uuid) in uuids.withIndex()) {
-            plugin.logger.info("(${index + 1}/${uuids.size}) Migrating $uuid")
-            val profile = fromHandler.serializeProfile(uuid, keys)
-            toHandler.loadSerializedProfile(profile)
+        try {
+            for ((index, uuid) in uuids.withIndex()) {
+                plugin.logger.info("(${index + 1}/${uuids.size}) Migrating $uuid")
+                val profile = fromHandler.serializeProfile(uuid, keys)
+                toHandler.loadSerializedProfile(profile)
+            }
+        } finally {
+            fromHandler.shutdown()
         }
 
         plugin.logger.info("Profile writes submitted! Waiting for completion...")
         toHandler.shutdown()
 
         plugin.logger.info("Updating previous handler...")
-        plugin.dataYml.set("previous-handler", handlerId)
+        plugin.dataYml.set("previous-handler", defaultHandler.id)
         plugin.dataYml.save()
         plugin.logger.info("The server will now automatically be restarted...")
 

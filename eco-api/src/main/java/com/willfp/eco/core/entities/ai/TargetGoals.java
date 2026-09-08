@@ -1,6 +1,7 @@
 package com.willfp.eco.core.entities.ai;
 
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Maps;
 import com.willfp.eco.core.config.interfaces.Config;
 import com.willfp.eco.core.entities.ai.target.*;
 import com.willfp.eco.core.serialization.KeyedDeserializer;
@@ -17,7 +18,8 @@ public final class TargetGoals {
     /**
      * All registered deserializers.
      */
-    private static final Map<NamespacedKey, KeyedDeserializer<? extends TargetGoal<?>>> BY_KEY = HashBiMap.create();
+    private static final Map<NamespacedKey, KeyedDeserializer<? extends TargetGoal<?>>> BY_KEY =
+            Maps.synchronizedBiMap(HashBiMap.<NamespacedKey, KeyedDeserializer<? extends TargetGoal<?>>>create());
 
     static {
         register(TargetGoalDefendVillage.DESERIALIZER);
@@ -46,7 +48,7 @@ public final class TargetGoals {
      * Get deserializer by key, with a defined type (to prevent cluttering code with unsafe casts).
      *
      * @param key   The key.
-     * @param clazz The type of target goal.
+     * @param clazz The class of the mob that the goal can be applied to.
      * @param <T>   The type of mob the goal can be applied to.
      * @return The deserializer, or null if not found.
      */
@@ -67,7 +69,7 @@ public final class TargetGoals {
      * @param config   The config.
      * @param priority The priority.
      * @param <T>      The entity type.
-     * @return The entity.
+     * @return The entity, modified if the goal was applied.
      */
     @NotNull
     @SuppressWarnings("unchecked")
@@ -92,9 +94,9 @@ public final class TargetGoals {
     /**
      * Register a deserializer for a target goal.
      *
-     * @param toRegister The target goal to register.
+     * @param toRegister The deserializer to register.
      * @param <T>        The type of deserializer.
-     * @return The deserializer.
+     * @return The registered deserializer.
      */
     @NotNull
     public static <T extends KeyedDeserializer<? extends TargetGoal<?>>> T register(@NotNull final T toRegister) {

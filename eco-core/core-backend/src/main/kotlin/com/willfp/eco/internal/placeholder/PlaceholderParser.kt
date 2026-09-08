@@ -1,7 +1,7 @@
 package com.willfp.eco.internal.placeholder
 
-import com.github.benmanes.caffeine.cache.Caffeine
 import com.willfp.eco.core.EcoPlugin
+import com.willfp.eco.core.cache.EcoCache
 import com.willfp.eco.core.integrations.placeholder.PlaceholderManager
 import com.willfp.eco.core.placeholder.InjectablePlaceholder
 import com.willfp.eco.core.placeholder.Placeholder
@@ -9,7 +9,7 @@ import com.willfp.eco.core.placeholder.context.PlaceholderContext
 import com.willfp.eco.util.StringUtils
 import com.willfp.eco.util.evaluateExpression
 import com.willfp.eco.util.toNiceString
-import java.util.concurrent.TimeUnit
+import java.time.Duration
 
 /*
 
@@ -19,14 +19,21 @@ but it's still best to minimise the memory overhead.
 
  */
 
-class PlaceholderParser {
+class PlaceholderParser(
+    private val progressBarCharacter: Char = '|',
+    private val progressBarBars: Int = 10,
+    private val progressBarCompleteFormat: String = "&a",
+    private val progressBarInProgressFormat: String = "&a",
+    private val progressBarIncompleteFormat: String = "&7"
+) {
     private val placeholderRegex = Regex("%([^% ]+)%")
     private val prettyMathExpressionRegex = Regex("(\\{\\^\\{)(.)+(}})")
     private val mathExpressionRegex = Regex("(\\{\\{)(.)+(}})")
+    private val progressBarExpressionRegex = Regex("(\\{#\\{)(.)+(}})")
 
-    private val placeholderLookupCache = Caffeine.newBuilder()
-        .expireAfterWrite(1, TimeUnit.SECONDS)
-        .build<PlaceholderLookup, Placeholder?>()
+    private val placeholderLookupCache = EcoCache.builder<PlaceholderLookup, Placeholder?>()
+        .expireAfterWrite(Duration.ofSeconds(1))
+        .build()
 
     fun translatePlacholders(text: String, context: PlaceholderContext): String {
         return translatePlacholders(text, context, context.injectableContext.placeholderInjections)
@@ -58,6 +65,25 @@ class PlaceholderParser {
                 val expression = matchResult.value.substring(2, matchResult.value.length - 2)
                 val result = evaluateExpression(expression, context)
                 acc.replace(matchResult.value, result.toString())
+            }
+
+            if ('#' in processed) {
+                // Evaluate progress bar expressions; the expression must evaluate to a
+                // percentage between 0 and 100, e.g. {#{%libreforge_item_progress_example%}}
+                processed = progressBarExpressionRegex.findAll(processed).fold(processed) { acc, matchResult ->
+                    val expression = matchResult.value.substring(3, matchResult.value.length - 2)
+                    val percentage = evaluateExpression(expression, context)
+                    val progress = (percentage / 100.0).coerceIn(0.0, 1.0)
+                    val bar = StringUtils.createProgressBar(
+                        progressBarCharacter,
+                        progressBarBars,
+                        progress,
+                        progressBarCompleteFormat,
+                        progressBarInProgressFormat,
+                        progressBarIncompleteFormat
+                    )
+                    acc.replace(matchResult.value, bar)
+                }
             }
         }
 
@@ -147,8 +173,10 @@ class PlaceholderParser {
 
         val lookup = PlaceholderLookup(args, plugin, injections)
 
-        val placeholder = placeholderLookupCache.get(lookup) {
-            it.findMatchingPlaceholder()
+        val placeholder = if (injections.isNullOrEmpty()) {
+            placeholderLookupCache.get(lookup) { it.findMatchingPlaceholder() }
+        } else {
+            lookup.findMatchingPlaceholder()
         }
 
         return placeholder?.getValue(args, context)
@@ -163,21 +191,22 @@ class PlaceholderParser {
         var lastAppendPosition = 0
 
         for (matchResult in placeholderRegex.findAll(text)) {
-            val placeholder = matchResult.groups[1]?.value ?: ""
+            val match = matchResult.value
+            val placeholder = match.substring(1, match.length - 1)
 
             val injectableResult = doGetResult(null, placeholder, injections, context)
 
-            val parts = placeholder.split("_", limit = 2)
+            val underscoreIndex = placeholder.indexOf('_')
 
             var result: String? = null
 
             if (injectableResult != null) {
                 result = injectableResult
-            } else if (parts.size == 2) {
-                val plugin = EcoPlugin.getPlugin(parts[0])
+            } else if (underscoreIndex != -1) {
+                val plugin = EcoPlugin.getPlugin(placeholder.substring(0, underscoreIndex))
 
                 if (plugin != null) {
-                    result = doGetResult(plugin, parts[1], null, context)
+                    result = doGetResult(plugin, placeholder.substring(underscoreIndex + 1), null, context)
                 }
             }
 
@@ -219,13 +248,13 @@ class PlaceholderParser {
             return injectableResult
         }
 
-        val parts = placeholder.split("_", limit = 2)
+        val underscoreIndex = placeholder.indexOf('_')
 
-        if (parts.size == 2) {
-            val plugin = EcoPlugin.getPlugin(parts[0])
+        if (underscoreIndex != -1) {
+            val plugin = EcoPlugin.getPlugin(placeholder.substring(0, underscoreIndex))
 
             if (plugin != null) {
-                return doGetResult(plugin, parts[1], null, context)
+                return doGetResult(plugin, placeholder.substring(underscoreIndex + 1), null, context)
             }
         }
 

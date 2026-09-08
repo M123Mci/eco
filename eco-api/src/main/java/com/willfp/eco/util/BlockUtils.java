@@ -1,5 +1,6 @@
 package com.willfp.eco.util;
 
+import com.willfp.eco.core.Eco;
 import com.willfp.eco.core.blocks.TestableBlock;
 import java.util.*;
 import org.bukkit.Chunk;
@@ -14,11 +15,18 @@ import org.jetbrains.annotations.NotNull;
 public final class BlockUtils {
     /**
      * Get a set of all blocks in contact with each other of a specific type.
+     * <p>
+     * The search is a flood fill starting at the given block, and treats every {@link BlockFace}
+     * value as adjacent, so diagonally touching blocks are included in the vein.
+     * <p>
+     * On Folia the search stops at the boundary of the calling thread's region, so a vein
+     * spanning two regions is returned only in part. Off Folia there is no such bound.
      *
-     * @param start         The initial block.
+     * @param start         The initial block, which is only included if it matches one of the allowed blocks.
      * @param allowedBlocks A list of all valid {@link TestableBlock}s.
      * @param limit         The maximum size of vein to return.
-     * @return A set of all {@link Block}s.
+     * @return A set of all matching {@link Block}s, containing at most limit blocks,
+     *         or empty if the initial block does not match.
      */
     @NotNull
     public static Set<Block> getVein(@NotNull final Block start,
@@ -43,6 +51,13 @@ public final class BlockUtils {
             for (BlockFace face : BlockFace.values()) {
                 Block adjacentBlock = currentBlock.getRelative(face);
 
+                // On Folia a vein can cross a region boundary, and reading a block in
+                // another region is not allowed. Off Folia this is always owned, so the
+                // fill is unbounded exactly as before.
+                if (!Eco.get().isOwnedByCurrentRegion(adjacentBlock.getLocation())) {
+                    continue;
+                }
+
                 if (!blocks.contains(adjacentBlock) &&
                         allowedBlocks.stream().anyMatch(testableBlock -> testableBlock.matches(adjacentBlock))) {
                     toProcess.add(adjacentBlock);
@@ -55,6 +70,9 @@ public final class BlockUtils {
 
     /**
      * Get if a block was placed by a player.
+     * <p>
+     * This reads a marker stored by eco in the persistent data container of the block's
+     * {@link Chunk}, so it only reports blocks placed while eco was tracking them.
      *
      * @param block The block.
      * @return If placed by a player.

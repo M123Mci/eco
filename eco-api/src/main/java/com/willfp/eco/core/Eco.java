@@ -10,8 +10,12 @@ import com.willfp.eco.core.config.interfaces.LoadableConfig;
 import com.willfp.eco.core.config.updating.ConfigHandler;
 import com.willfp.eco.core.data.ExtendedPersistentDataContainer;
 import com.willfp.eco.core.data.PlayerProfile;
+import com.willfp.eco.core.data.PlayerProfileResolver;
 import com.willfp.eco.core.data.ServerProfile;
 import com.willfp.eco.core.data.keys.PersistentDataKey;
+import com.willfp.eco.core.datapack.DatapackContributor;
+import com.willfp.eco.core.datapack.DatapackHandle;
+import com.willfp.eco.core.datapack.InstallResult;
 import com.willfp.eco.core.drops.DropQueue;
 import com.willfp.eco.core.entities.ai.EntityController;
 import com.willfp.eco.core.events.EventManager;
@@ -25,11 +29,18 @@ import com.willfp.eco.core.gui.menu.MenuBuilder;
 import com.willfp.eco.core.gui.menu.MenuType;
 import com.willfp.eco.core.gui.slot.SlotBuilder;
 import com.willfp.eco.core.gui.slot.functional.SlotProvider;
+import com.willfp.eco.core.gui.view.LocationViewBuilder;
+import com.willfp.eco.core.gui.view.MerchantViewBuilder;
+import com.willfp.eco.core.gui.view.ViewBuilder;
+import com.willfp.eco.core.integrations.hologram.Hologram;
+import com.willfp.eco.core.integrations.hologram.HologramOptions;
 import com.willfp.eco.core.items.TestableItem;
+import com.willfp.eco.core.math.ExpressionEnvironment;
 import com.willfp.eco.core.packet.Packet;
 import com.willfp.eco.core.placeholder.context.PlaceholderContext;
 import com.willfp.eco.core.proxy.ProxyFactory;
 import com.willfp.eco.core.scheduling.Scheduler;
+import com.willfp.eco.core.version.Version;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,8 +55,12 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
+import org.bukkit.inventory.view.MerchantView;
+import org.bukkit.inventory.view.builder.InventoryViewBuilder;
+import org.bukkit.inventory.view.builder.LocationInventoryViewBuilder;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.jetbrains.annotations.ApiStatus;
@@ -57,8 +72,8 @@ import org.jetbrains.annotations.Nullable;
  * <p>
  * <strong>Do not use this in your plugins!</strong> It can and will contain
  * breaking changes between minor versions and even patches, and you will create compatibility
- * issues by. All parts of this have been abstracted into logically named API components that you
- * can use.
+ * issues by depending on it. All parts of this have been abstracted into logically named API
+ * components that you can use instead.
  *
  * @see Eco#get()
  */
@@ -77,7 +92,7 @@ public interface Eco {
     /**
      * Create an event manager.
      *
-     * @param plugin The plugin.F
+     * @param plugin The plugin.
      * @return The event manager.
      */
     @NotNull
@@ -114,7 +129,7 @@ public interface Eco {
      * Create an ExtensionLoader.
      *
      * @param plugin The plugin.
-     * @return The factory.
+     * @return The extension loader.
      */
     @NotNull
     ExtensionLoader createExtensionLoader(@NotNull EcoPlugin plugin);
@@ -172,12 +187,12 @@ public interface Eco {
     /**
      * Create PluginCommandBase implementation of {@link PluginCommand}.
      *
-     * @param parentDelegate the enclosing class of this implementation.
-     * @param plugin         the plugin.
-     * @param name           the name of the command.
-     * @param permission     the permission of the command.
-     * @param playersOnly    if the command is players only.
-     * @return The PluginCommandBase implementation
+     * @param parentDelegate The enclosing class of this implementation.
+     * @param plugin         The plugin.
+     * @param name           The name of the command.
+     * @param permission     The permission of the command.
+     * @param playersOnly    If the command is players only.
+     * @return The PluginCommandBase implementation.
      */
     @NotNull
     PluginCommandBase createPluginCommand(@NotNull PluginCommandBase parentDelegate,
@@ -189,12 +204,12 @@ public interface Eco {
     /**
      * Create CommandBase implementation of {@link com.willfp.eco.core.command.impl.Subcommand Subcommand}.
      *
-     * @param parentDelegate the enclosing class of this implementation.
-     * @param plugin         the plugin.
-     * @param name           the name of the command.
-     * @param permission     the permission of the command.
-     * @param playersOnly    if the command is players only.
-     * @return The CommandBase implementation
+     * @param parentDelegate The enclosing class of this implementation.
+     * @param plugin         The plugin.
+     * @param name           The name of the command.
+     * @param permission     The permission of the command.
+     * @param playersOnly    If the command is players only.
+     * @return The CommandBase implementation.
      */
     @NotNull
     CommandBase createSubcommand(@NotNull CommandBase parentDelegate,
@@ -206,7 +221,7 @@ public interface Eco {
     /**
      * Updatable config.
      *
-     * @param configName            The name of the config
+     * @param configName            The name of the config.
      * @param plugin                The plugin.
      * @param subDirectoryPath      The subdirectory path.
      * @param source                The class that owns the resource.
@@ -229,7 +244,7 @@ public interface Eco {
     /**
      * Loadable config.
      *
-     * @param configName            The name of the config
+     * @param configName            The name of the config.
      * @param plugin                The plugin.
      * @param subDirectoryPath      The subdirectory path.
      * @param source                The class that owns the resource.
@@ -317,6 +332,38 @@ public interface Eco {
                         @NotNull Menu additional);
 
     /**
+     * Create a view builder.
+     *
+     * @param type The menu type.
+     * @param <V>  The type of view created by the builder.
+     * @return The builder.
+     */
+    @NotNull
+    <V extends InventoryView> ViewBuilder<V> createViewBuilder(
+            @NotNull org.bukkit.inventory.MenuType.Typed<V, ? extends InventoryViewBuilder<V>> type
+    );
+
+    /**
+     * Create a view builder for a menu type backed by a block in the world.
+     *
+     * @param type The menu type.
+     * @param <V>  The type of view created by the builder.
+     * @return The builder.
+     */
+    @NotNull
+    <V extends InventoryView> LocationViewBuilder<V> createLocationViewBuilder(
+            @NotNull org.bukkit.inventory.MenuType.Typed<V, LocationInventoryViewBuilder<V>> type
+    );
+
+    /**
+     * Create a view builder for the merchant (villager trading) menu type.
+     *
+     * @return The builder.
+     */
+    @NotNull
+    MerchantViewBuilder<MerchantView> createMerchantViewBuilder();
+
+    /**
      * Clean up ClassLoader (etc.) to allow PlugMan support.
      *
      * @param plugin The plugin to clean up.
@@ -329,6 +376,16 @@ public interface Eco {
      * @param plugin The plugin.
      */
     void addNewPlugin(@NotNull EcoPlugin plugin);
+
+    /**
+     * Register a plugin that failed to load because it requires a newer version of eco
+     * than the one that is running.
+     *
+     * @param pluginName      The name of the plugin.
+     * @param requiredVersion The version of eco that the plugin requires.
+     */
+    void registerOutdatedPlugin(@NotNull String pluginName,
+                                @NotNull Version requiredVersion);
 
     /**
      * Get plugin by name.
@@ -404,7 +461,25 @@ public interface Eco {
     ServerProfile getServerProfile();
 
     /**
+     * Set the resolver used to decide which UUID a player's data is stored against.
+     *
+     * @param resolver The resolver, or null to store data against the player's own UUID.
+     */
+    void setPlayerProfileResolver(@Nullable PlayerProfileResolver resolver);
+
+    /**
+     * Get the resolver used to decide which UUID a player's data is stored against.
+     *
+     * @return The resolver, resolving to the player's own UUID if none has been set.
+     */
+    @NotNull
+    PlayerProfileResolver getPlayerProfileResolver();
+
+    /**
      * Create dummy entity - never spawned, exists purely in code.
+     * <p>
+     * On Folia, the calling thread must own the region containing the location. Call this
+     * from inside a task scheduled on that region.
      *
      * @param location The location.
      * @return The entity.
@@ -413,7 +488,21 @@ public interface Eco {
     Entity createDummyEntity(@NotNull Location location);
 
     /**
-     * Create a {@link NamespacedKey} quickly
+     * Create a hologram.
+     * <p>
+     * On Folia, the calling thread must own the region containing the location. Call this
+     * from inside a task scheduled on that region.
+     *
+     * @param location The location.
+     * @param options  The hologram options.
+     * @return The hologram.
+     */
+    @NotNull
+    Hologram createHologram(@NotNull Location location,
+                            @NotNull HologramOptions options);
+
+    /**
+     * Create a {@link NamespacedKey} quickly.
      * <p>
      * Bypasses the constructor, allowing for the creation of invalid keys, therefore this is
      * considered unsafe and should only be called after the key has been confirmed to be valid.
@@ -448,6 +537,9 @@ public interface Eco {
 
     /**
      * Create controlled entity from a mob.
+     * <p>
+     * On Folia, the calling thread must own the region containing the entity, and so must
+     * every later call on the returned controller: it mutates the entity's AI goals.
      *
      * @param mob The mob.
      * @param <T> The mob type.
@@ -525,6 +617,26 @@ public interface Eco {
     double getTPS();
 
     /**
+     * Get if the thread calling this owns the region containing a location.
+     * <p>
+     * Always true off Folia, where there is one thread and it owns everything. On Folia,
+     * a task may only read or write blocks and entities in a region it owns, so this is
+     * how code decides whether it can act now or must be scheduled.
+     *
+     * @param location The location.
+     * @return If the current thread owns the region.
+     */
+    boolean isOwnedByCurrentRegion(@NotNull Location location);
+
+    /**
+     * Get if the thread calling this owns the region containing an entity.
+     *
+     * @param entity The entity.
+     * @return If the current thread owns the region.
+     */
+    boolean isOwnedByCurrentRegion(@NotNull Entity entity);
+
+    /**
      * Evaluate an expression.
      *
      * @param expression The expression.
@@ -536,6 +648,44 @@ public interface Eco {
                     @NotNull PlaceholderContext context);
 
     /**
+     * Create a builder for a new expression environment.
+     * <p>
+     * Use this to compile an expression once and evaluate it many times over varying numeric
+     * inputs, without routing through the placeholder pipeline.
+     *
+     * @return The builder.
+     */
+    @NotNull
+    ExpressionEnvironment.Builder createExpressionEnvironmentBuilder();
+
+    /**
+     * Get the datapack handle belonging to a plugin.
+     *
+     * @param plugin The plugin.
+     * @return The handle.
+     */
+    @NotNull
+    DatapackHandle getDatapackHandle(@NotNull EcoPlugin plugin);
+
+    /**
+     * Register a datapack contributor for a plugin.
+     *
+     * @param plugin      The plugin.
+     * @param contributor The contributor.
+     * @return The outcome of the rebuild this registration triggered.
+     */
+    @NotNull
+    InstallResult registerDatapackContributor(@NotNull EcoPlugin plugin,
+                                              @NotNull DatapackContributor contributor);
+
+    /**
+     * If any plugin has written bootstrap-only datapack content that is not yet live.
+     *
+     * @return If a restart is pending.
+     */
+    boolean isDatapackRestartPending();
+
+    /**
      * Get the menu a player currently has open.
      *
      * @param player The player.
@@ -545,8 +695,9 @@ public interface Eco {
     Menu getOpenMenu(@NotNull Player player);
 
     /**
-     * Register bukkit recipe without resending recipe packet.
-     * @param recipe the recipe
+     * Register a bukkit recipe without resending the recipe packet.
+     *
+     * @param recipe The recipe.
      */
     void addBukkitRecipeNoResend(Recipe recipe);
 
@@ -557,9 +708,10 @@ public interface Eco {
 
 
     /**
-     * Remove a bukkit recipe without resending recipe packet.
-      * @param key the recipe key
-      * @return if the recipe was successfully removed
+     * Remove a bukkit recipe without resending the recipe packet.
+     *
+     * @param key The recipe key.
+     * @return If the recipe was successfully removed.
      */
     boolean removeBukkitRecipeNoResend(@NotNull NamespacedKey key);
 
@@ -600,6 +752,28 @@ public interface Eco {
      */
     void sendPacket(@NotNull Player player,
                     @NotNull Packet packet);
+
+    /**
+     * Show a waypoint to a player on their locator bar.
+     *
+     * @param viewer   The player to show it to.
+     * @param id       The waypoint ID, used later to hide it.
+     * @param location The waypoint location.
+     * @param color    The packed RGB colour, or null for the default style colour.
+     */
+    void showWaypoint(@NotNull Player viewer,
+                      @NotNull UUID id,
+                      @NotNull Location location,
+                      @Nullable Integer color);
+
+    /**
+     * Hide a waypoint previously shown to a player.
+     *
+     * @param viewer The player.
+     * @param id     The waypoint ID.
+     */
+    void hideWaypoint(@NotNull Player viewer,
+                      @NotNull UUID id);
 
     /**
      * Translate placeholders in a string.
@@ -650,7 +824,7 @@ public interface Eco {
     /**
      * Get the instance of eco; the bridge between the api frontend and the implementation backend.
      *
-     * @return The instance of eco.
+     * @return The instance of eco, or null if eco has not yet been initialized.
      */
     @ApiStatus.Internal
     static Eco get() {
@@ -671,8 +845,11 @@ public interface Eco {
 
         /**
          * Initialize eco.
+         * <p>
+         * Can only be called once, by the eco implementation itself.
          *
          * @param eco The instance of eco.
+         * @throws IllegalArgumentException If eco has already been initialized.
          */
         @ApiStatus.Internal
         static void set(@NotNull final Eco eco) {
@@ -684,12 +861,15 @@ public interface Eco {
         /**
          * Get eco.
          *
-         * @return eco.
+         * @return The instance of eco, or null if it has not been set yet.
          */
         static Eco get() {
             return eco;
         }
 
+        /**
+         * Utility class, cannot be instantiated.
+         */
         private Instance() {
             throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
         }

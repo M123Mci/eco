@@ -40,29 +40,38 @@ public abstract class Extension implements PluginLike {
     private ExtensionMetadata metadata = null;
 
     /**
-     * Method to validate metadata and enable extension.
+     * Enable the extension, calling {@link #onEnable()}.
      */
     public final void enable() {
-        Preconditions.checkNotNull(metadata, "Metadata cannot be null!");
         this.onEnable();
     }
 
     /**
-     * Method to disable extension.
+     * Disable the extension, calling {@link #onDisable()}.
      */
     public final void disable() {
         this.onDisable();
     }
 
     /**
-     * Method to handle after load.
+     * Validate that the metadata has been set, then run any tasks on load via {@link #onLoad()}.
+     *
+     * @throws NullPointerException If the metadata has not been set.
+     */
+    public final void loadExtension() {
+        Preconditions.checkNotNull(metadata, "Metadata cannot be null!");
+        this.onLoad();
+    }
+
+    /**
+     * Handle the base plugin having finished loading, calling {@link #onAfterLoad()}.
      */
     public final void handleAfterLoad() {
         this.onAfterLoad();
     }
 
     /**
-     * Method to handle plugin reloads.
+     * Handle a plugin reload, calling {@link #onReload()}.
      */
     public final void handleReload() {
         this.onReload();
@@ -74,12 +83,19 @@ public abstract class Extension implements PluginLike {
     protected abstract void onEnable();
 
     /**
+     * Called when Extension is loaded.
+     */
+    protected void onLoad() {
+        // Override if needed
+    }
+
+    /**
      * Called when Extension is disabled.
      */
     protected abstract void onDisable();
 
     /**
-     * Called the once the base plugin is done loading.
+     * Called once the base plugin is done loading.
      */
     protected void onAfterLoad() {
         // Override if needed
@@ -95,7 +111,8 @@ public abstract class Extension implements PluginLike {
     /**
      * Set the metadata of the extension.
      * <p>
-     * Must be called before enabling.
+     * Must be called before {@link #loadExtension()}, and before any of the metadata-backed
+     * getters are used.
      *
      * @param metadata The metadata to set.
      */
@@ -107,6 +124,7 @@ public abstract class Extension implements PluginLike {
      * Get the name of the extension.
      *
      * @return The name of the metadata attached to the extension.
+     * @throws NullPointerException If the metadata has not been set.
      */
     public final String getName() {
         Preconditions.checkNotNull(metadata, "Metadata cannot be null!");
@@ -117,6 +135,7 @@ public abstract class Extension implements PluginLike {
      * Get the author of the extension.
      *
      * @return The author of the metadata attached to the extension.
+     * @throws NullPointerException If the metadata has not been set.
      */
     public final String getAuthor() {
         Preconditions.checkNotNull(metadata, "Metadata cannot be null!");
@@ -127,6 +146,7 @@ public abstract class Extension implements PluginLike {
      * Get the version of the extension.
      *
      * @return The version of the metadata attached to the extension.
+     * @throws NullPointerException If the metadata has not been set.
      */
     public final String getVersion() {
         Preconditions.checkNotNull(metadata, "Metadata cannot be null!");

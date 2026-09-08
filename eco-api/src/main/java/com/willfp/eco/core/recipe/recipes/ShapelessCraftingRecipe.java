@@ -21,6 +21,13 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Shapeless crafting recipe.
+ * <p>
+ * The parts list holds one entry per required ingredient, in no particular order, and
+ * unlike {@link ShapedCraftingRecipe} it is not padded to nine entries. A matrix matches
+ * when every non-empty stack in it consumes a distinct part and no parts are left over.
+ * <p>
+ * Instances are created through {@link #builder(EcoPlugin, String)} and are only live
+ * once {@link #register()} has been called.
  */
 @Beta
 public final class ShapelessCraftingRecipe implements CraftingRecipe {
@@ -54,21 +61,43 @@ public final class ShapelessCraftingRecipe implements CraftingRecipe {
      */
     private final String permission;
 
+    /**
+     * Whether this recipe also fires inside the vanilla Crafter block.
+     */
+    private final boolean crafterSupported;
+
+    /**
+     * Create a new shapeless crafting recipe.
+     *
+     * @param plugin           The plugin that owns the recipe.
+     * @param key              The recipe key, namespaced under the plugin's ID.
+     * @param parts            The recipe parts, one per required ingredient.
+     * @param output           The output.
+     * @param permission       The permission required to craft, or null for none.
+     * @param crafterSupported Whether the recipe also fires in the vanilla Crafter block.
+     */
     private ShapelessCraftingRecipe(@NotNull final EcoPlugin plugin,
                                     @NotNull final String key,
                                     @NotNull final List<TestableItem> parts,
                                     @NotNull final ItemStack output,
-                                    @Nullable final String permission) {
+                                    @Nullable final String permission,
+                                    final boolean crafterSupported) {
         this.plugin = plugin;
         this.parts = parts;
         this.key = plugin.getNamespacedKeyFactory().create(key);
         this.displayedKey = plugin.getNamespacedKeyFactory().create(key + "_displayed");
         this.output = output;
         this.permission = permission;
+        this.crafterSupported = crafterSupported;
+    }
+
+    @Override
+    public boolean isCrafterSupported() {
+        return this.crafterSupported;
     }
 
     /**
-     * Make a new test.
+     * Make a new test, holding a fresh mutable copy of this recipe's parts.
      *
      * @return The test.
      */
@@ -107,6 +136,11 @@ public final class ShapelessCraftingRecipe implements CraftingRecipe {
 
         ShapelessRecipe shapelessRecipe = new ShapelessRecipe(this.getKey(), this.getOutput());
         for (TestableItem part : parts) {
+            // Mirror ShapedCraftingRecipe: skip empty/AIR parts so Bukkit
+            // doesn't reject the recipe with IllegalArgumentException.
+            if (part instanceof EmptyTestableItem) {
+                continue;
+            }
             shapelessRecipe.addIngredient(part.getItem().getType());
         }
 
@@ -150,6 +184,23 @@ public final class ShapelessCraftingRecipe implements CraftingRecipe {
         }
 
         Recipes.scheduleBukkitRecipeRegistration(shapelessRecipe);
+
+        if (this.crafterSupported) {
+            NamespacedKey crafterKey = new NamespacedKey(
+                    this.getKey().getNamespace(),
+                    this.getKey().getKey() + "_crafter"
+            );
+            Recipes.scheduleBukkitRecipeRemoval(crafterKey);
+
+            ShapelessRecipe crafterRecipe = new ShapelessRecipe(crafterKey, this.getOutput());
+            for (TestableItem part : parts) {
+                if (part instanceof EmptyTestableItem) {
+                    continue;
+                }
+                crafterRecipe.addIngredient(new RecipeChoice.ExactChoice(part.getItem().clone()));
+            }
+            Recipes.scheduleBukkitRecipeRegistration(crafterRecipe);
+        }
     }
 
     /**
@@ -163,6 +214,8 @@ public final class ShapelessCraftingRecipe implements CraftingRecipe {
 
     /**
      * Create a new recipe builder.
+     * <p>
+     * The key is lowercased and namespaced under the plugin's ID when the recipe is built.
      *
      * @param plugin The plugin that owns the recipe.
      * @param key    The recipe key.
@@ -229,11 +282,11 @@ public final class ShapelessCraftingRecipe implements CraftingRecipe {
     }
 
     /**
-     * Builder for recipes.
+     * Builder for {@link ShapelessCraftingRecipe}s.
      */
     public static final class Builder {
         /**
-         * The recipe parts.
+         * The recipe parts, in the order they were added.
          */
         private final List<TestableItem> recipeParts = new ArrayList<>();
 
@@ -246,6 +299,11 @@ public final class ShapelessCraftingRecipe implements CraftingRecipe {
          * The permission for the recipe.
          */
         private String permission = null;
+
+        /**
+         * Whether the recipe also fires in the vanilla Crafter block.
+         */
+        private boolean crafterSupported = false;
 
         /**
          * The key of the recipe.
@@ -303,7 +361,26 @@ public final class ShapelessCraftingRecipe implements CraftingRecipe {
         }
 
         /**
+         * Set whether the recipe also fires in the vanilla Crafter block.
+         * <p>
+         * When true, {@link ShapelessCraftingRecipe#register()} additionally
+         * registers a Bukkit {@link ShapelessRecipe} at the key
+         * {@code <namespace>:<key>_crafter} with {@link RecipeChoice.ExactChoice}
+         * ingredients so the Crafter can match it; {@code AutocrafterPatch}
+         * will not cancel events fired for these recipes.
+         *
+         * @param crafterSupported Whether to enable Crafter support.
+         * @return The builder.
+         */
+        public Builder setCrafterSupported(final boolean crafterSupported) {
+            this.crafterSupported = crafterSupported;
+            return this;
+        }
+
+        /**
          * Check if recipe parts are all air.
+         * <p>
+         * Returns true if no parts have been added at all.
          *
          * @return If recipe parts are all air.
          */
@@ -318,16 +395,22 @@ public final class ShapelessCraftingRecipe implements CraftingRecipe {
 
         /**
          * Build the recipe.
+         * <p>
+         * The built recipe is not registered; call
+         * {@link ShapelessCraftingRecipe#register()} on the result.
          *
          * @return The built recipe.
          */
         public ShapelessCraftingRecipe build() {
-            return new ShapelessCraftingRecipe(plugin, key.toLowerCase(), recipeParts, output, permission);
+            return new ShapelessCraftingRecipe(plugin, key.toLowerCase(), recipeParts, output, permission, crafterSupported);
         }
     }
 
     /**
-     * Test for shapeless recipes.
+     * Stateful, single-use test for shapeless recipes.
+     * <p>
+     * Each call to {@link #matchAndRemove(ItemStack)} consumes at most one remaining part,
+     * so a recipe is satisfied when every input has matched and nothing remains.
      */
     public static final class RecipeTest {
         /**
@@ -335,6 +418,11 @@ public final class ShapelessCraftingRecipe implements CraftingRecipe {
          */
         private final List<TestableItem> remaining;
 
+        /**
+         * Create a new test over a copy of the recipe's parts.
+         *
+         * @param recipe The recipe to test against.
+         */
         private RecipeTest(@NotNull final ShapelessCraftingRecipe recipe) {
             this.remaining = new ArrayList<>(recipe.getParts());
         }

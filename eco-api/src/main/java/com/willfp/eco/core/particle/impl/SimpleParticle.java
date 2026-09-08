@@ -4,10 +4,11 @@ import com.willfp.eco.core.particle.SpawnableParticle;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Empty (invalid) particle that is spawned when an invalid key is provided.
+ * A particle backed directly by a bukkit {@link Particle}, with no extra data.
  */
 public final class SimpleParticle implements SpawnableParticle {
     /**
@@ -24,6 +25,15 @@ public final class SimpleParticle implements SpawnableParticle {
         this.particle = particle;
     }
 
+    /**
+     * Spawn the particle at a location.
+     * <p>
+     * Particles that require data which a bare particle name cannot carry are not spawned,
+     * as spawning them without that data would throw.
+     *
+     * @param location The location.
+     * @param amount   The amount to spawn.
+     */
     @Override
     public void spawn(@NotNull final Location location,
                       final int amount) {
@@ -33,10 +43,44 @@ public final class SimpleParticle implements SpawnableParticle {
             return;
         }
 
-        if (particle.getDataType() == Float.class) {
-            world.spawnParticle(particle, location, amount, 0, 0, 0, 1f);
-        } else {
+        Class<?> dataType = particle.getDataType();
+
+        if (dataType == Void.class) {
             world.spawnParticle(particle, location, amount, 0, 0, 0, 0);
+        } else if (dataType == Float.class) {
+            world.spawnParticle(particle, location, amount, 0, 0, 0, 0, 0f);
+        } else if (dataType == Integer.class) {
+            world.spawnParticle(particle, location, amount, 0, 0, 0, 0, 0);
+        }
+
+        /*
+        Any other data type requires data that a bare particle name cannot carry, e.g. DUST
+        needs a colour. Spawning it without data throws, so it is skipped here - use a
+        particle factory instead, e.g. dust:00ff00 or dust_transition:ff0000:00ff00.
+         */
+    }
+
+    /**
+     * Spawn the particle at a location, visible only to a single player.
+     * <p>
+     * Skips the same data-carrying particles as {@link #spawn(Location, int)}.
+     *
+     * @param player   The player to spawn the particle for.
+     * @param location The location.
+     * @param amount   The amount to spawn.
+     */
+    @Override
+    public void spawnTo(@NotNull final Player player,
+                        @NotNull final Location location,
+                        final int amount) {
+        Class<?> dataType = particle.getDataType();
+
+        if (dataType == Void.class) {
+            player.spawnParticle(particle, location, amount, 0, 0, 0, 0);
+        } else if (dataType == Float.class) {
+            player.spawnParticle(particle, location, amount, 0, 0, 0, 0, 0f);
+        } else if (dataType == Integer.class) {
+            player.spawnParticle(particle, location, amount, 0, 0, 0, 0, 0);
         }
     }
 }

@@ -1,73 +1,44 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.21")
-    }
-}
-
 plugins {
     id("java-library")
-    id("com.gradleup.shadow") version "9.3.1"
+    id("com.gradleup.shadow") version "9.4.1"
     id("maven-publish")
-    id("java")
-    kotlin("jvm") version "2.3.0"
+    kotlin("jvm") version "2.3.21"
 }
 
-fun configuredPath(value: String?): String? = value?.trim()?.takeIf { it.isNotEmpty() }
+group = "com.willfp"
+version = providers.gradleProperty("version").get()
 
-val localPluginRepoDir = configuredPath(providers.gradleProperty("localPluginRepoDir").orNull)
-    ?: configuredPath(providers.gradleProperty("local_maven_repo_path").orNull)
-    ?: configuredPath(System.getenv("LOCAL_PLUGIN_REPO_DIR"))
-    ?: "C:/PluginLibs/Maven"
-val externalPluginLibDir = configuredPath(providers.gradleProperty("externalPluginLibDir").orNull)
-    ?: configuredPath(System.getenv("EXTERNAL_PLUGIN_LIB_DIR"))
-    ?: "C:/PluginLibs"
-
-extra["resolvedLocalPluginRepoDir"] = localPluginRepoDir
+val localPluginRepoDir = providers.gradleProperty("localPluginRepoDir")
+    .orElse("D:/Minecraft/PluginLibs/Maven").get()
+val externalPluginLibDir = providers.gradleProperty("externalPluginLibDir")
+    .orElse("D:/Minecraft/PluginLibs/Jars").get()
 extra["externalPluginLibDir"] = externalPluginLibDir
 
 dependencies {
     implementation(project(":eco-api"))
     implementation(project(path = ":eco-core:core-plugin", configuration = "shadow"))
     implementation(project(":eco-core:core-backend"))
-    implementation(project(":eco-core:core-folia"))
-    implementation(project(path = ":eco-core:core-nms:v1_21_4", configuration = "reobf"))
-    implementation(project(path = ":eco-core:core-nms:v1_21_5", configuration = "reobf"))
-    implementation(project(path = ":eco-core:core-nms:v1_21_6", configuration = "reobf"))
-    implementation(project(path = ":eco-core:core-nms:v1_21_7", configuration = "reobf"))
-    implementation(project(path = ":eco-core:core-nms:v1_21_8", configuration = "reobf"))
-    implementation(project(path = ":eco-core:core-nms:v1_21_10", configuration = "reobf"))
-    implementation(project(path = ":eco-core:core-nms:v1_21_11", configuration = "shadow"))
+    implementation(project(path = ":eco-core:core-nms:v26_2", configuration = "shadow"))
 }
 
 allprojects {
-    apply(plugin = "java")
     apply(plugin = "java-library")
     apply(plugin = "maven-publish")
     apply(plugin = "com.gradleup.shadow")
-    apply(plugin = "kotlin")
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+    group = rootProject.group
+    version = rootProject.version
 
     repositories {
-        maven {
-            name = "localPluginRepo"
-            url = uri(file(localPluginRepoDir))
-        }
         mavenCentral()
 
         maven("https://repo.auxilor.io/repository/maven-public/")
 
-        // CombatLogX (must be before JitPack to exclude sirblobman from JitPack)
-        maven("https://nexus.sirblobman.xyz/public/")
-
         maven("https://jitpack.io") {
             content {
                 includeGroupByRegex("com\\.github\\..*")
-                excludeGroup("com.github.sirblobman")
                 excludeGroup("com.github.TownyAdvanced")
             }
         }
@@ -108,9 +79,6 @@ allprojects {
         // PlayerPoints
         maven("https://repo.rosewooddev.io/repository/public/")
 
-        // Denizen
-        maven("https://maven.citizensnpcs.co/repo")
-
         // IridiumSkyblock
         maven("https://nexus.iridiumdevelopment.net/repository/maven-releases/")
 
@@ -118,7 +86,7 @@ allprojects {
         maven("https://repo.william278.net/releases")
 
         // FancyHolograms
-        maven("https://repo.fancyplugins.de/releases")
+        maven("https://repo.fancyinnovations.com/releases")
 
         // Nexo
         maven("https://repo.nexomc.com/releases")
@@ -126,153 +94,84 @@ allprojects {
         // CraftEngine
         maven("https://repo.momirealms.net/releases/")
 
-        // CoinsEngine
+        // ExcellentEconomy and ExcellentShop
         maven("https://repo.nightexpressdev.com/releases")
 
         //Towny
         maven("https://repo.glaremasters.me/repository/towny/")
+
+        // FactionsUUID
+        exclusiveContent {
+            forRepository {
+                maven("https://dependency.download/releases")
+            }
+
+            filter {
+                includeGroup("dev.kitteh")
+            }
+        }
     }
 
+    repositories { maven { url = uri(localPluginRepoDir) } }
     dependencies {
-        // Kotlin
-        implementation(kotlin("stdlib", version = "2.3.0"))
+        implementation(kotlin("stdlib", "2.3.21"))
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-
-        // Included in spigot jar, no need to move to implementation
-        compileOnly("org.jetbrains:annotations:26.0.2")
-        compileOnly("com.google.guava:guava:32.0.0-jre")
-
-        // Test
-        testImplementation("org.junit.jupiter:junit-jupiter-api:6.0.2")
-        testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.0.2")
-
-        // Adventure
-        implementation("net.kyori:adventure-api:4.26.1") {
-            exclude("com.github.ben-manes.caffeine", "caffeine")
-        }
-        implementation("net.kyori:adventure-text-serializer-gson:4.26.1") {
-            exclude("com.google.code.gson", "gson") // Prevent shading into the jar
-        }
-        implementation("net.kyori:adventure-text-serializer-legacy:4.26.1")
-
-        // Other
+        compileOnly("org.jetbrains:annotations:26.1.0")
+        compileOnly("net.kyori:adventure-api:5.0.1")
+        compileOnly("net.kyori:adventure-text-serializer-gson:5.0.1")
+        compileOnly("net.kyori:adventure-text-serializer-legacy:5.0.1")
         implementation("com.github.ben-manes.caffeine:caffeine:3.2.3")
-        implementation("org.apache.maven:maven-artifact:3.9.12")
     }
-
-    tasks.withType<JavaCompile> {
-        options.encoding = "UTF-8"
-    }
-
-    configurations.all {
-        exclude(group = "org.codehaus.plexus", module = "plexus-utils")
-        exclude(group = "com.mojang", module = "brigadier")
-        exclude(group = "org.kitteh", module = "paste-gg-api")
-        exclude(group = "org.kitteh", module = "pastegg")
-        exclude(group = "org.spongepowered", module = "configurate-hocon")
-        exclude(group = "com.darkblade12", module = "particleeffect")
-        exclude(group = "com.github.cryptomorin", module = "XSeries")
-        exclude(group = "net.wesjd", module = "anvilgui")
-        exclude(group = "org.slf4j", module = "slf4j-api")
-    }
-
-    configurations.testImplementation {
-        setExtendsFrom(listOf(configurations.compileOnly.get(), configurations.implementation.get()))
-    }
-
-    tasks {
-        compileKotlin {
-            compilerOptions {
-                jvmTarget.set(JvmTarget.JVM_21)
-            }
-        }
-
-        compileJava {
-            dependsOn(clean)
-            options.encoding = "UTF-8"
-            options.isDeprecation = true
-        }
-
-        test {
-            useJUnitPlatform()
-            include("**/*Pdf")
-
-            // Show test results.
-            testLogging {
-                events("passed", "skipped", "failed")
-            }
-        }
-
-        build {
-            dependsOn(shadowJar)
-        }
-
-        withType<JavaCompile>().configureEach {
-            options.release.set(21)
-        }
-    }
-
     java {
+        toolchain.languageVersion.set(JavaLanguageVersion.of(25))
         withSourcesJar()
-        toolchain {
-            languageVersion.set(JavaLanguageVersion.of(21))
-        }
     }
+    tasks.withType<JavaCompile>().configureEach {
+        options.encoding = "UTF-8"
+        options.release.set(25)
+    }
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions.jvmTarget.set(JvmTarget.JVM_25)
+    }
+    tasks.withType<AbstractArchiveTask>().configureEach {
+        isPreserveFileTimestamps = false
+        isReproducibleFileOrder = true
+    }
+    tasks.named("build") { dependsOn("shadowJar") }
 }
 
-tasks {
-    shadowJar {
-        exclude("META-INF/**")
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-        relocate("org.bstats", "com.willfp.eco.libs.bstats")
-        relocate("redempt.crunch", "com.willfp.eco.libs.crunch")
-        relocate("org.apache.commons.lang3", "com.willfp.eco.libs.lang3")
-        relocate("org.apache.maven", "com.willfp.eco.libs.maven")
-        relocate("org.checkerframework", "com.willfp.eco.libs.checkerframework")
-        relocate("org.intellij", "com.willfp.eco.libs.intellij")
-        relocate("org.jetbrains.annotations", "com.willfp.eco.libs.jetbrains.annotations")
-        //relocate("org.jetbrains.exposed", "com.willfp.eco.libs.exposed")
-        relocate("javax.annotation", "com.willfp.eco.libs.annotation")
-        relocate("com.google.errorprone", "com.willfp.eco.libs.errorprone")
-        relocate("com.google.j2objc", "com.willfp.eco.libs.j2objc")
-        relocate("com.google.thirdparty", "com.willfp.eco.libs.google.thirdparty")
-        relocate("com.google.protobuf", "com.willfp.eco.libs.google.protobuf") // No I don't know either
-        relocate("google.protobuf", "com.willfp.eco.libs.protobuf") // Still don't know
-        relocate("com.zaxxer.hikari", "com.willfp.eco.libs.hikari")
-        //relocate("com.mysql", "com.willfp.eco.libs.mysql")
-        relocate("com.mongodb", "com.willfp.eco.libs.mongodb")
-        relocate("org.bson", "com.willfp.eco.libs.bson")
-        relocate("org.reactivestreams", "com.willfp.eco.libs.reactivestreams")
-        relocate("reactor.", "com.willfp.eco.libs.reactor.") // Dot in name to be safe
-        relocate("com.moandjiezana.toml", "com.willfp.eco.libs.toml")
-        relocate("com.willfp.modelenginebridge", "com.willfp.eco.libs.modelenginebridge")
-
-        relocate("kotlin", "com.willfp.eco.libs.kotlin") {
-            exclude("kotlin.kotlin_builtins")
-        }
-
-        /*
-        Caffeine is not shaded so that it can be accessed directly by eco plugins.
-        Also, not relocating adventure, because it's a pain in the ass, and it doesn't *seem* to be causing loader constraint violations.
-         */
-    }
+tasks.shadowJar {
+    archiveFileName.set("eco-${project.version}.jar")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    exclude("META-INF/*.SF", "META-INF/*.RSA", "META-INF/*.DSA")
+    relocate("org.apache.commons.lang3", "com.willfp.eco.libs.lang3")
+    relocate("org.intellij", "com.willfp.eco.libs.intellij")
+    relocate("org.jetbrains.annotations", "com.willfp.eco.libs.jetbrains.annotations")
+    relocate("com.willfp.modelenginebridge", "com.willfp.eco.libs.modelenginebridge")
+    relocate("com.github.benmanes.caffeine", "com.willfp.eco.libs.caffeine")
+    // MongoDB 的协程签名必须与插件内 Kotlin 一起重定位，不能由外部加载器混用。
+    relocate("com.mongodb", "com.willfp.eco.libs.mongodb")
+    relocate("org.bson", "com.willfp.eco.libs.bson")
+    relocate("org.reactivestreams", "com.willfp.eco.libs.reactivestreams")
+    relocate("reactor", "com.willfp.eco.libs.reactor")
+    relocate("kotlin", "com.willfp.eco.libs.kotlin") { exclude("kotlin.kotlin_builtins") }
+    mergeServiceFiles()
 }
 
-group = "com.willfp"
-version = findProperty("version")!!
+publishing {
+    publications {
+        create<MavenPublication>("plugin") {
+            artifactId = "eco-plugin"
+            artifact(tasks.shadowJar) { classifier = null }
+        }
+    }
+    repositories { maven { name = "localPlugins"; url = uri(localPluginRepoDir) } }
+}
 
-extra["unifiedPluginConfig"] = mapOf(
-    "artifacts" to listOf(
-        mapOf(
-            "projectPath" to ":",
-            "taskName" to "shadowJar",
-            "fileName" to "eco.jar",
-            "groupId" to project.group.toString(),
-            "artifactId" to "eco",
-            "publishToMaven" to true,
-        ),
-    ),
-)
-
-apply(from = rootProject.file("gradle/unified-plugin-conventions.gradle"))
+tasks.register<Copy>("distribute") {
+    description = "将已构建的插件与 API 复制到本机依赖目录"
+    dependsOn(tasks.shadowJar, ":eco-api:jar")
+    from(tasks.shadowJar)
+    from(project(":eco-api").tasks.named("jar"))
+    into(externalPluginLibDir)
+}

@@ -1,41 +1,41 @@
 package com.willfp.eco.core.integrations.hologram;
 
-import com.willfp.eco.core.integrations.IntegrationRegistry;
+import com.willfp.eco.core.Eco;
 import java.util.List;
 import org.bukkit.Location;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Class to handle hologram integrations.
+ * Class to create holograms.
+ * <p>
+ * Unlike the other classes in this package's siblings, this does not delegate to third-party
+ * plugin integrations: holograms are created by eco itself and are always available.
  */
 public final class HologramManager {
     /**
-     * A set of all registered integrations.
-     */
-    private static final IntegrationRegistry<HologramIntegration> REGISTRY = new IntegrationRegistry<>();
-
-    /**
-     * Register a new integration.
+     * Create a hologram with default options.
      *
-     * @param integration The integration to register.
+     * @param location The location.
+     * @param contents The contents for the hologram, one entry per line.
+     * @return The hologram.
      */
-    public static void register(@NotNull final HologramIntegration integration) {
-        REGISTRY.register(integration);
+    @NotNull
+    public static Hologram createHologram(@NotNull final Location location,
+                                          @NotNull final List<String> contents) {
+        return createHologram(location, HologramOptions.builder().contents(contents).build());
     }
 
     /**
-     * Create hologram.
+     * Create a hologram with custom options.
      *
      * @param location The location.
-     * @param contents The contents for the hologram.
+     * @param options  The hologram options.
      * @return The hologram.
      */
+    @NotNull
     public static Hologram createHologram(@NotNull final Location location,
-                                          @NotNull final List<String> contents) {
-        return REGISTRY.firstSafely(
-                integration -> integration.createHologram(location, contents),
-                new DummyHologram()
-        );
+                                          @NotNull final HologramOptions options) {
+        return Eco.get().createHologram(location, options);
     }
 
     private HologramManager() {

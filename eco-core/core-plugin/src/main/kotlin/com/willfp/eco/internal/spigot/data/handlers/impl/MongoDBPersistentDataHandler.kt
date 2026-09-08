@@ -2,7 +2,7 @@ package com.willfp.eco.internal.spigot.data.handlers.impl
 
 import com.mongodb.MongoClientSettings
 import com.mongodb.client.model.Filters
-import com.mongodb.client.model.ReplaceOptions
+import com.mongodb.client.model.UpdateOptions
 import com.mongodb.kotlin.client.coroutine.MongoClient
 import com.willfp.eco.core.config.Configs
 import com.willfp.eco.core.config.interfaces.Config
@@ -21,7 +21,6 @@ import org.bson.BsonDecimal128
 import org.bson.BsonDocument
 import org.bson.BsonDouble
 import org.bson.BsonInt32
-import org.bson.BsonObjectId
 import org.bson.BsonString
 import org.bson.BsonValue
 import org.bson.codecs.configuration.CodecRegistries
@@ -37,6 +36,10 @@ class MongoDBPersistentDataHandler(
     )
 
     private val client = MongoClient.create(config.getString("url"))
+
+    override fun doClose() {
+        client.close()
+    }
     private val database = client.getDatabase(config.getString("database"))
 
     private val collection = database.getCollection<BsonDocument>(config.getString("collection"))
@@ -171,17 +174,18 @@ class MongoDBPersistentDataHandler(
             runBlocking {
                 val filter = Filters.eq("uuid", uuid.toString())
 
-                val profile = collection.find(filter).firstOrNull()
-                    ?: BsonDocument()
-                        .append("_id", BsonObjectId())
-                        .append("uuid", BsonString(uuid.toString()))
-
-                profile.append(key.key.toString(), serialize(value))
-
-                collection.replaceOne(
+                // 原子更新单个数据键，保留原有顶层字段以及键名中的点号。
+                // 先读整份档案再 replaceOne 会覆盖其他线程刚保存的键。
+                val update = BsonDocument("uuid", BsonString(uuid.toString()))
+                    .append(key.key.toString(), serialize(value))
+                val merged = BsonDocument("\$mergeObjects", BsonArray(listOf(
+                    BsonString("\$\$ROOT"),
+                    BsonDocument("\$literal", update)
+                )))
+                collection.updateOne(
                     filter,
-                    profile,
-                    ReplaceOptions().upsert(true)
+                    listOf(BsonDocument("\$replaceWith", merged)),
+                    UpdateOptions().upsert(true)
                 )
             }
         }

@@ -1,9 +1,8 @@
 package com.willfp.eco.core.sound;
 
 import com.willfp.eco.core.config.interfaces.Config;
-import com.willfp.eco.core.serialization.ConfigDeserializer;
-import com.willfp.eco.util.SoundUtils;
-import java.util.Objects;
+import com.willfp.eco.core.placeholder.context.PlaceholderContext;
+
 import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
@@ -13,21 +12,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A sound that can be played at a location.
- *
- * @param sound    The sound.
- * @param pitch    The pitch.
- * @param volume   The volume.
- * @param enabled  Whether the sound is enabled.
- * @param category The sound category.
+ * A playable Bukkit {@link Sound}.
  */
-public record PlayableSound(@NotNull Sound sound,
-                            double pitch,
-                            double volume,
-                            boolean enabled,
-                            @NotNull SoundCategory category) {
-
-    private static final ConfigDeserializer<PlayableSound> DESERIALIZER = new Deserializer();
+public final class PlayableSound extends AbstractPlayableSound<Sound> {
 
     /**
      * Create a sound with default volume, enabled true, and category MASTER.
@@ -41,26 +28,56 @@ public record PlayableSound(@NotNull Sound sound,
     }
 
     /**
-     * Play the sound to a player if enabled.
+     * Create a sound with a fixed pitch.
      *
-     * @param player The player.
+     * @param sound    The sound.
+     * @param pitch    The pitch.
+     * @param volume   The volume.
+     * @param enabled  If the sound is enabled.
+     * @param category The sound category.
      */
-    public void playTo(@NotNull final Player player) {
-        if (!enabled) return;
-        player.playSound(player.getLocation(), sound, category, (float) volume, (float) pitch);
+    public PlayableSound(@NotNull final Sound sound,
+                         final double pitch,
+                         final double volume,
+                         final boolean enabled,
+                         @NotNull final SoundCategory category) {
+        this(sound, pitch, pitch, volume, enabled, category);
     }
 
     /**
-     * Play the sound at a location if enabled.
+     * Create a sound with a variable pitch.
      *
-     * @param location The location.
+     * @param sound    The sound.
+     * @param minPitch The minimum pitch.
+     * @param maxPitch The maximum pitch.
+     * @param volume   The volume.
+     * @param enabled  If the sound is enabled.
+     * @param category The sound category.
      */
-    public void playAt(@NotNull final Location location) {
-        if (!enabled) return;
-        World world = location.getWorld();
-        if (world != null) {
-            world.playSound(location, sound, category, (float) volume, (float) pitch);
-        }
+    public PlayableSound(@NotNull final Sound sound,
+                         final double minPitch,
+                         final double maxPitch,
+                         final double volume,
+                         final boolean enabled,
+                         @NotNull final SoundCategory category) {
+        super(sound, minPitch, maxPitch, volume, enabled, category);
+    }
+
+    @Override
+    protected void doPlayTo(@NotNull final Player player,
+                            @NotNull final SoundCategory category,
+                            final float volume,
+                            final float pitch) {
+        player.playSound(player.getLocation(), source(), category, volume, pitch);
+    }
+
+    @Override
+    protected void doPlayAt(@NotNull final World world,
+                            @NotNull final Location location,
+                            @NotNull final SoundCategory category,
+                            final float volume,
+                            final float pitch) {
+        world.playSound(location, source(), category, volume, pitch);
     }
 
     /**
@@ -70,38 +87,21 @@ public record PlayableSound(@NotNull Sound sound,
      * @return The sound, or null if invalid.
      */
     @Nullable
-    public static PlayableSound create(@NotNull final Config config) {
-        return DESERIALIZER.deserialize(config);
+    public static AbstractPlayableSound<?> create(@NotNull final Config config) {
+        return AbstractPlayableSound.create(config);
     }
 
     /**
-     * The deserializer for {@link PlayableSound}.
+     * Parse a playable sound from config, evaluating pitch/volume expressions against
+     * the given placeholder context.
+     *
+     * @param config  The config.
+     * @param context The placeholder context to evaluate pitch/volume expressions against.
+     * @return The sound, or null if invalid.
      */
-    private static final class Deserializer implements ConfigDeserializer<PlayableSound> {
-        @Override
-        public @Nullable PlayableSound deserialize(@NotNull final Config config) {
-            if (!config.has("sound")) return null;
-
-            Sound sound = SoundUtils.getSound(config.getString("sound"));
-            if (sound == null) return null;
-
-            double pitch = Objects.requireNonNullElse(config.getDoubleOrNull("pitch"), 1.0);
-            double volume = Objects.requireNonNullElse(config.getDoubleOrNull("volume"), 1.0);
-            boolean enabled = Objects.requireNonNullElse(config.getBoolOrNull("enabled"), true);
-
-            SoundCategory category;
-            String catString = config.getStringOrNull("category");
-            if (catString == null) {
-                category = SoundCategory.MASTER;
-            } else {
-                try {
-                    category = SoundCategory.valueOf(catString.toUpperCase());
-                } catch (IllegalArgumentException e) {
-                    category = SoundCategory.MASTER;
-                }
-            }
-
-            return new PlayableSound(sound, pitch, volume, enabled, category);
-        }
+    @Nullable
+    public static AbstractPlayableSound<?> create(@NotNull final Config config,
+                                                  @NotNull final PlaceholderContext context) {
+        return AbstractPlayableSound.create(config, context);
     }
 }

@@ -5,9 +5,11 @@ import com.willfp.eco.core.entities.args.EntityArgParser;
 import com.willfp.eco.core.entities.impl.EmptyTestableEntity;
 import com.willfp.eco.core.entities.impl.ModifiedTestableEntity;
 import com.willfp.eco.core.entities.impl.SimpleTestableEntity;
+import com.willfp.eco.core.entities.tag.EntityTag;
 import com.willfp.eco.util.NamespacedKeyUtils;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -28,7 +30,12 @@ public final class Entities {
     /**
      * All entity parsers.
      */
-    private static final List<EntityArgParser> ARG_PARSERS = new ArrayList<>();
+    private static final List<EntityArgParser> ARG_PARSERS = new CopyOnWriteArrayList<>();
+
+    /**
+     * All tags.
+     */
+    private static final Map<String, EntityTag> TAGS = new ConcurrentHashMap<>();
 
     /**
      * The lookup handler.
@@ -36,10 +43,10 @@ public final class Entities {
     private static final EntitiesLookupHandler ENTITIES_LOOKUP_HANDLER = new EntitiesLookupHandler(Entities::doParse);
 
     /**
-     * Register a new custom item.
+     * Register a new custom entity.
      *
-     * @param key  The key of the item.
-     * @param item The item.
+     * @param key  The key of the entity.
+     * @param item The entity.
      */
     public static void registerCustomEntity(@NotNull final NamespacedKey key,
                                             @NotNull final TestableEntity item) {
@@ -98,7 +105,19 @@ public final class Entities {
 
         String[] split = args[0].toLowerCase().split(":");
 
-        if (split.length == 1) {
+        String base = split[0];
+        boolean isTag = base.startsWith("#");
+
+        if (isTag) {
+            String tag = args[0].substring(1);
+            EntityTag entityTag = TAGS.get(tag);
+
+            if (entityTag == null) {
+                return new EmptyTestableEntity();
+            }
+
+            entity = entityTag.toTestableEntity();
+        } else if (split.length == 1) {
             EntityType type;
             try {
                 type = EntityType.valueOf(args[0].toUpperCase());
@@ -166,15 +185,15 @@ public final class Entities {
     }
 
     /**
-     * Get a Testable Entity from an ItemStack.
+     * Get a {@link TestableEntity} from an {@link Entity}.
      * <p>
      * Will search for registered entity first. If there are no matches in the registry,
-     * then it will return a {@link com.willfp.eco.core.entities.impl.SimpleTestableEntity} matching the entity type.
+     * then it will return a {@link SimpleTestableEntity} matching the entity type.
      * <p>
-     * If the entity is not custom and has unknown type, this will return null.
+     * If the entity is null, or is not custom and has an unknown type, this will return null.
      *
-     * @param entity The Entity.
-     * @return The found Testable Entity.
+     * @param entity The entity, which may be null.
+     * @return The found testable entity, or null if none could be created.
      */
     @Nullable
     public static TestableEntity getEntity(@Nullable final Entity entity) {
@@ -196,10 +215,10 @@ public final class Entities {
     }
 
     /**
-     * Get if entity is a custom entity.
+     * Get if an entity is a registered custom entity.
      *
      * @param entity The entity to check.
-     * @return If is custom.
+     * @return If the entity matches any registered custom entity.
      */
     public static boolean isCustomEntity(@NotNull final Entity entity) {
         for (TestableEntity testable : REGISTRY.values()) {
@@ -211,12 +230,30 @@ public final class Entities {
     }
 
     /**
-     * Get all registered custom items.
+     * Get all registered custom entities.
      *
-     * @return A set of all items.
+     * @return A set of all registered custom entities.
      */
     public static Set<TestableEntity> getCustomEntities() {
         return new HashSet<>(REGISTRY.values());
+    }
+
+    /**
+     * Register a new entity tag.
+     *
+     * @param tag The tag.
+     */
+    public static void registerTag(@NotNull final EntityTag tag) {
+        TAGS.put(tag.getIdentifier(), tag);
+    }
+
+    /**
+     * Get all tags.
+     *
+     * @return All tags.
+     */
+    public static Collection<EntityTag> getTags() {
+        return TAGS.values();
     }
 
     private Entities() {

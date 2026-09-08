@@ -56,6 +56,27 @@ conflicts:
 # Disable it if it changes drop mechanics too much for you.
 use-fast-collated-drops: true
 
+# Controls how eco handles italics on custom item names/lore.
+# false (default): every name/lore line is forced non-italic.
+#   Safe choice if your plugins/lore weren't written with vanilla italics in mind.
+# true: matches vanilla exactly. Only colored/formatted lines get italics forced off; plain
+#   lines are left alone, so plain lore renders italic like vanilla lore normally does, and
+#   anvil-renamed items behave like vanilla. Turn this on if you rely on custom_name-based
+#   resource packs, or want correct vanilla behavior over legacy compatibility.
+use-vanilla-item-name-format: false
+
+# How eco removes its own client-side lore lines when reverting an item.
+# false (default): display lines are matched on the components themselves, by the shape eco
+#   writes them in. Lore added by other plugins is left untouched, including lines that start
+#   with the same prefix eco uses (AdvancedEnchantments writes its enchantment descriptions
+#   this way).
+# true: every line starting with eco's prefix is removed, and the whole lore is round-tripped
+#   through legacy text. This is how eco used to work. It deletes other plugins' lore lines
+#   that share eco's prefix, and discards anything legacy text can't represent (translatable
+#   lines, fonts, hover and click events, sprites). Only enable this if you relied on the old
+#   behavior.
+use-legacy-lore-revert: false
+
 # Display frames massively optimize PacketWindowItems, however some users have
 # reported display bugs by using it. If you have any problems with it, then you
 # should disable this option.
@@ -77,23 +98,25 @@ log-full-extension-errors: false
 # a custom crafting table, though, this won't affect anything, and you should disable the option.
 displayed-recipes: true
 
+# If the server should be shut down when a plugin requires a newer version of eco than the
+# one that is installed. Those plugins fail to load, so their items and data are left
+# unregistered for the whole session, which can cause other plugins to strip or delete them.
+# The server is shut down cleanly, after worlds have loaded, and players are kept out until
+# then. Turn this off to start the server anyway.
+shutdown-on-outdated-plugin: true
+
 # If eco plugins should not check for updates; only enable this if you know what you're doing
 # as there can be urgent hotfixes that you are then not notified about. If you're confident
 # that you can manage updates on your own, turn this on.
 no-update-checker: false
 
-# Math expressions are parsed using Crunch, which allows for variables to be used in expressions.
-# If this is false, variables will be used to represent placeholders, which leads to fewer
-# expression compilations at the expense of slower evaluation times. If this is true, variables
-# will instead be translated before compilation to reduce evaluation times at the expense of
-# longer compilation times. If your expressions usually contain many variables, then you
-# should enable this option as it may improve performance. If you're unsure, leave it disabled.
-use-immediate-placeholder-translation-for-math: false
-
-# The time (in milliseconds) for math expressions to be cached for. Higher values will lead to
+# The time (in milliseconds) for math expression results to be cached for. Higher values will lead to
 # faster evaluation times (less CPU usage) at the expense of slightly more memory usage and
 # less reactive values.
 math-cache-ttl: 200
+
+# 保留原有表达式语义：true 时先展开占位符，再解析数学表达式。
+use-immediate-placeholder-translation-for-math: false
 
 # The time (in minutes) for literal patterns to be cached for. Higher values will lead to
 # faster evaluation times (less CPU usage) at the expense of slightly more memory usage and
@@ -105,6 +128,23 @@ literal-cache-ttl: 10
 # counts. This is completely anonymous and no personal information is logged. This data
 # is primarily used for optimisation and server insights.
 playerflow: true
+
+# Options for the {#{expression}} progress bar placeholder syntax.
+progress-bar:
+  # The character used to draw each section of the bar.
+  character: "|"
+
+  # The number of sections in the bar.
+  bars: 10
+
+  # The color/format applied to completed sections.
+  complete-format: "&a"
+
+  # The color/format applied to the in-progress section.
+  in-progress-format: "&a"
+
+  # The color/format applied to incomplete sections.
+  incomplete-format: "&7"
 
 # If the packet display system should activate on items that have no meta. This is disabled
 # by default for performance reasons, but if you want to use the packet display system on
@@ -119,3 +159,33 @@ enforce-preparing-recipes: false
 # If enabled, eco will save the health of players when they log out and restore it when they log back in
 # as a workaround for player health being reset to 20 on login.
 enable-health-fix: true
+
+# The duration (in seconds) during which the health fix will be applied
+# Requires enable-health-fix to be true.
+health-fix-duration: 3
+
+# The interval (in seconds) at which the health fix will be applied during the duration
+health-fix-interval: 1
+
+kill-attribution:
+  # If a player should be credited for a kill they didn't land the final blow
+  # on, such as one finished by fire, lightning, or poison. Leave this false to
+  # only credit a blow that was lethal at the moment it landed.
+  credit-indirect-kills: false
+
+  # How many ticks after a player damages an entity that entity's death is
+  # still credited to them. Only used when credit-indirect-kills is true.
+  # Fire ticks land 20 ticks apart, so lower values will miss burn kills.
+  window-ticks: 100
+
+datapacks:
+  # If datapacks belonging to plugins that are no longer installed should be
+  # deleted on startup. This is the admin override for eco's removal policy:
+  # eco normally refuses to remove datapack content that a loaded world has
+  # already seen, because chunks can reference biome, dimension or damage type
+  # IDs that would then no longer resolve.
+  #
+  # WARNING: enabling this can permanently break existing worlds. Only turn it
+  # on if you know the removed content was never generated with, and take a
+  # backup first.
+  remove-orphaned: false

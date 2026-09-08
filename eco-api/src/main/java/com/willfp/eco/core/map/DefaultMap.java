@@ -1,34 +1,38 @@
 package com.willfp.eco.core.map;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NonNull;
 
 /**
  * A map with a default value.
+ * <p>
+ * Getting a key that is absent (or mapped to null) inserts a freshly supplied default value for
+ * that key and returns it, so {@link #get(Object)} never returns null. Getting a null key returns
+ * a default value without inserting anything.
  *
  * @param <K> The key type.
  * @param <V> The value type.
  */
-public class DefaultMap<K, V> implements ConcurrentMap<K, V> {
+public class DefaultMap<K, V> implements Map<K, V> {
     /**
-     * The map.
+     * The backing map.
      */
-    private final ConcurrentMap<K, V> map;
+    private final Map<K, V> map;
 
     /**
-     * The default value.
+     * The supplier of the default value, called each time a default is needed.
      */
     private final Supplier<V> defaultValue;
 
     /**
-     * Create a new default map.
+     * Create a new default map, backed by a {@link HashMap}.
+     * <p>
+     * The same default value instance is shared by every key.
      *
      * @param defaultValue The default value.
      */
@@ -37,21 +41,21 @@ public class DefaultMap<K, V> implements ConcurrentMap<K, V> {
     }
 
     /**
-     * Create a new default map.
+     * Create a new default map, backed by a {@link HashMap}.
      *
-     * @param defaultValue The default value.
+     * @param defaultValue The supplier of the default value.
      */
     public DefaultMap(@NotNull final Supplier<V> defaultValue) {
-        this(new ConcurrentHashMap<>(), defaultValue);
+        this(new HashMap<>(), defaultValue);
     }
 
     /**
      * Create a new default map.
      *
-     * @param map          The map.
+     * @param map          The backing map.
      * @param defaultValue The default value.
      */
-    public DefaultMap(@NotNull final ConcurrentMap<K, V> map,
+    public DefaultMap(@NotNull final Map<K, V> map,
                       @NotNull final V defaultValue) {
         this(map, () -> defaultValue);
     }
@@ -59,10 +63,10 @@ public class DefaultMap<K, V> implements ConcurrentMap<K, V> {
     /**
      * Create a new default map.
      *
-     * @param map          The map.
-     * @param defaultValue The default value.
+     * @param map          The backing map.
+     * @param defaultValue The supplier of the default value.
      */
-    public DefaultMap(@NotNull final ConcurrentMap<K, V> map,
+    public DefaultMap(@NotNull final Map<K, V> map,
                       @NotNull final Supplier<V> defaultValue) {
         this.map = map;
         this.defaultValue = defaultValue;
@@ -151,7 +155,7 @@ public class DefaultMap<K, V> implements ConcurrentMap<K, V> {
      */
     @NotNull
     public static <K, K1, V> DefaultMap<K, Map<K1, V>> createNestedMap() {
-        return new DefaultMap<>(ConcurrentHashMap::new);
+        return new DefaultMap<>(HashMap::new);
     }
 
     /**
@@ -165,25 +169,5 @@ public class DefaultMap<K, V> implements ConcurrentMap<K, V> {
     @NotNull
     public static <K, K1, V> DefaultMap<K, ListMap<K1, V>> createNestedListMap() {
         return new DefaultMap<>(ListMap::new);
-    }
-
-    @Override
-    public V putIfAbsent(@NonNull K key, V value) {
-        return map.putIfAbsent(key, value);
-    }
-
-    @Override
-    public boolean remove(@NonNull Object key, Object value) {
-        return map.remove(key, value);
-    }
-
-    @Override
-    public boolean replace(@NonNull K key, @NonNull V oldValue, @NonNull V newValue) {
-        return map.replace(key, oldValue, newValue);
-    }
-
-    @Override
-    public V replace(@NonNull K key, @NonNull V value) {
-        return map.replace(key, value);
     }
 }

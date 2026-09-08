@@ -1,51 +1,118 @@
 package com.willfp.eco.core.version;
 
-import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
+
 /**
- * A minimal class to represent a version, uses DefaultArtifactVersion under the hood.
+ * A minimal class to represent a version with semantic comparison.
+ * <p>
+ * Versions are compared segment by segment, treating missing segments as zero, so that
+ * {@code 1.0} and {@code 1.0.0} are equal. A version with no qualifier is considered greater
+ * than the same version with one, and two qualified versions are compared by the qualifier
+ * lexicographically.
  */
 public class Version implements Comparable<Version> {
     /**
-     * The version.
+     * The version string exactly as it was passed in.
      */
-    private final DefaultArtifactVersion version;
+    private final String raw;
+
+    /**
+     * The numeric segments of the version, with unparseable segments treated as zero.
+     */
+    private final int[] parts;
+
+    /**
+     * The qualifier after the first dash, or an empty string if there is none.
+     */
+    private final String qualifier;
 
     /**
      * Create a new version.
      *
-     * @param version The version.
+     * @param version The version string (e.g. "1.2.3" or "1.2.3-SNAPSHOT").
      */
     public Version(@NotNull final String version) {
-        this.version = new DefaultArtifactVersion(version);
+        this.raw = version;
+        int dashIdx = version.indexOf('-');
+        String numeric = dashIdx >= 0 ? version.substring(0, dashIdx) : version;
+        this.qualifier = dashIdx >= 0 ? version.substring(dashIdx + 1) : "";
+        String[] segments = numeric.split("\\.", -1);
+        this.parts = new int[segments.length];
+        for (int i = 0; i < segments.length; i++) {
+            try {
+                this.parts[i] = Integer.parseInt(segments[i]);
+            } catch (NumberFormatException e) {
+                this.parts[i] = 0;
+            }
+        }
     }
 
     @Override
     public int compareTo(@NotNull final Version o) {
-        return this.version.compareTo(o.version);
+        int maxLen = Math.max(this.parts.length, o.parts.length);
+        for (int i = 0; i < maxLen; i++) {
+            int a = i < this.parts.length ? this.parts[i] : 0;
+            int b = i < o.parts.length ? o.parts[i] : 0;
+            if (a != b) {
+                return Integer.compare(a, b);
+            }
+        }
+        // No qualifier beats a qualifier (1.0 > 1.0-SNAPSHOT)
+        boolean thisHasQual = !this.qualifier.isEmpty();
+        boolean otherHasQual = !o.qualifier.isEmpty();
+        if (thisHasQual == otherHasQual) {
+            return this.qualifier.compareTo(o.qualifier);
+        }
+        return thisHasQual ? -1 : 1;
+    }
+
+    /**
+     * Whether this version satisfies a minimum required version, ignoring qualifiers.
+     * <p>
+     * Qualifiers are build tags rather than versions behind, so {@code 2026.34-local} and
+     * {@code 2026.34-SNAPSHOT} both satisfy a requirement of {@code 2026.34}.
+     *
+     * @param required The minimum required version.
+     * @return True if this version is at least the required version.
+     */
+    public boolean isAtLeast(@NotNull final Version required) {
+        int maxLen = Math.max(this.parts.length, required.parts.length);
+        for (int i = 0; i < maxLen; i++) {
+            int a = i < this.parts.length ? this.parts[i] : 0;
+            int b = i < required.parts.length ? required.parts[i] : 0;
+            if (a != b) {
+                return a > b;
+            }
+        }
+        return true;
     }
 
     @Override
     public String toString() {
-        return this.version.toString();
+        return raw;
     }
 
     @Override
-    public boolean equals(@NotNull final Object obj) {
+    public boolean equals(final Object obj) {
         if (obj == this) {
             return true;
         }
-
         if (!(obj instanceof Version other)) {
             return false;
         }
-
-        return this.version.equals(other.version);
+        return compareTo(other) == 0;
     }
 
     @Override
     public int hashCode() {
-        return this.version.hashCode();
+        // Normalize trailing zero parts so "1.0" and "1.0.0" hash identically
+        int len = parts.length;
+        while (len > 1 && parts[len - 1] == 0) {
+            len--;
+        }
+        int result = Arrays.hashCode(Arrays.copyOf(parts, len));
+        return qualifier.isEmpty() ? result : 31 * result + qualifier.hashCode();
     }
 }

@@ -1,7 +1,6 @@
 package com.willfp.eco.core.blocks;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.willfp.eco.core.cache.EcoCache;
 import com.willfp.eco.core.blocks.args.BlockArgParseResult;
 import com.willfp.eco.core.blocks.args.BlockArgParser;
 import com.willfp.eco.core.blocks.impl.EmptyTestableBlock;
@@ -14,7 +13,8 @@ import com.willfp.eco.util.NamespacedKeyUtils;
 import com.willfp.eco.util.NumberUtils;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.time.Duration;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.bukkit.Location;
@@ -30,28 +30,38 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class Blocks {
     /**
-     * All entities.
+     * All registered custom blocks, keyed by their {@link NamespacedKey}.
      */
     private static final Map<NamespacedKey, TestableBlock> REGISTRY = new ConcurrentHashMap<>();
 
     /**
      * Cached custom block lookups, using {@link HashedBlock}.
      */
-    private static final LoadingCache<HashedBlock, Optional<TestableBlock>> CACHE = Caffeine.newBuilder()
-            .expireAfterAccess(10, TimeUnit.MINUTES)
-            .build(
-                    key -> {
-                        TestableBlock match = null;
-                        for (TestableBlock block : REGISTRY.values()) {
-                            if (block.shouldMarkAsCustom() && block.matches(key.getBlock())) {
-                                match = block;
-                                break;
-                            }
-                        }
-
-                        return Optional.ofNullable(match);
+    private static final EcoCache<HashedBlock, Optional<TestableBlock>> CACHE = EcoCache.<HashedBlock, Optional<TestableBlock>>builder()
+            .expireAfterAccess(Duration.ofMinutes(10))
+            .build(key -> {
+                TestableBlock match = null;
+                for (TestableBlock block : REGISTRY.values()) {
+                    if (block.shouldMarkAsCustom() && block.matches(key.getBlock())) {
+                        match = block;
+                        break;
                     }
-            );
+                }
+
+                return Optional.ofNullable(match);
+            });
+
+    /**
+     * Locations currently being resolved by {@link #getCustomBlock(Block)}, per thread.
+     * <p>
+     * A registered block that layers a modifier on top of a plain material (e.g. a note
+     * block with a specific instrument) matches via a {@link MaterialTestableBlock} handle,
+     * whose {@link MaterialTestableBlock#matches(Block)} itself calls {@link #isCustomBlock(Block)}
+     * to exclude locations shadowed by a more specific custom block. Without this guard, that
+     * call re-enters the cache computation for the same location, which Caffeine cannot
+     * complete and answers with an unusable result.
+     */
+    private static final ThreadLocal<Set<HashedBlock>> RESOLVING = ThreadLocal.withInitial(HashSet::new);
 
     /**
      * All block providers.
@@ -61,7 +71,7 @@ public final class Blocks {
     /**
      * All block parsers.
      */
-    private static final List<BlockArgParser> ARG_PARSERS = new ArrayList<>();
+    private static final List<BlockArgParser> ARG_PARSERS = new CopyOnWriteArrayList<>();
 
     /**
      * The lookup handler.
@@ -76,12 +86,12 @@ public final class Blocks {
     /**
      * Friendly material names (without underscores, etc.)
      */
-    private static final Map<String, Material> FRIENDLY_MATERIAL_NAMES = new HashMap<>();
+    private static final Map<String, Material> FRIENDLY_MATERIAL_NAMES = new ConcurrentHashMap<>();
 
     /**
      * All tags.
      */
-    private static final Map<String, BlockTag> TAGS = new HashMap<>();
+    private static final Map<String, BlockTag> TAGS = new ConcurrentHashMap<>();
 
     /**
      * Register a new custom block.
@@ -154,9 +164,31 @@ public final class Blocks {
      * <p>
      * If you want to get a Block instance from this, then just call
      * {@link TestableBlock#place(Location)}.
+     * <p>
+     * A lookup string is a set of space-separated tokens, where a quoted section is
+     * treated as a single token. The first token selects the base block, and may be
+     * any of:
+     * <ul>
+     *     <li>{@code stone} - a vanilla block material; underscores may be omitted and a
+     *     trailing {@code s} is accepted, so {@code oak_log}, {@code oaklog} and
+     *     {@code oaklogs} all resolve</li>
+     *     <li>{@code *stone} - the same, but matching the material even if the block is
+     *     also a registered custom block</li>
+     *     <li>{@code #tag} - a {@link BlockTag} registered with {@link #registerTag(BlockTag)}</li>
+     *     <li>{@code namespace:key} - a custom block registered under that key, or a block
+     *     resolved on demand from the {@link BlockProvider} registered for that namespace</li>
+     * </ul>
+     * Every remaining token is passed to the registered {@link BlockArgParser}s as a
+     * modifier of the block data; these are conventionally of the form {@code name:value},
+     * for example {@code age:3}. Modifiers are only applied when the base block resolved
+     * to a {@link MaterialTestableBlock}. Unlike items, there is no stack size token.
+     * <p>
+     * Whole lookup strings can be combined with segment separators, which must be
+     * surrounded by spaces: {@code a || b} matches either segment, and {@code a ? b}
+     * resolves to the first segment that produces a valid block.
      *
      * @param key The lookup string.
-     * @return The testable block, or an empty testable block if not found.
+     * @return The testable block, or an {@link EmptyTestableBlock} if not found.
      */
     @NotNull
     public static TestableBlock lookup(@NotNull final String key) {
@@ -324,7 +356,21 @@ public final class Blocks {
             return null;
         }
 
-        return CACHE.get(HashedBlock.of(block)).map(Blocks::getOrWrap).orElse(null);
+        HashedBlock hashed = HashedBlock.of(block);
+        Set<HashedBlock> resolving = RESOLVING.get();
+
+        if (!resolving.add(hashed)) {
+            // Already resolving this location on this thread; this is a re-entrant call
+            // made while testing a candidate for a match, so treat it as unshadowed rather
+            // than recursing into the cache.
+            return null;
+        }
+
+        try {
+            return CACHE.get(hashed).map(Blocks::getOrWrap).orElse(null);
+        } finally {
+            resolving.remove(hashed);
+        }
     }
 
     /**
@@ -388,6 +434,26 @@ public final class Blocks {
     }
 
     /**
+     * Get the effective hardness of a block, preferring the value reported by
+     * the custom block plugin when available.
+     * <p>
+     * Falls back to {@link org.bukkit.Material#getHardness()} when no custom
+     * hardness is registered (e.g. vanilla blocks or plugins that don't expose it).
+     *
+     * @param block The block.
+     * @return The hardness, the vanilla material hardness as a fallback, or -1 if the block is null.
+     */
+    public static float hardness(@Nullable final Block block) {
+        if (block == null) {
+            return -1f;
+        }
+
+        TestableBlock testable = getBlock(block);
+        float custom = testable.hardness();
+        return custom >= 0 ? custom : block.getType().getHardness();
+    }
+
+    /**
      * Get if a block is empty.
      *
      * @param block The block.
@@ -416,7 +482,7 @@ public final class Blocks {
     }
 
     /**
-     * Get all registered custom blocks.
+     * Get if any block matches any of the testable blocks.
      *
      * @param blocks         The blocks.
      * @param testableBlocks The testable blocks.
@@ -451,13 +517,16 @@ public final class Blocks {
         return TAGS.values();
     }
 
+    /**
+     * Prevent instantiation of this utility class.
+     */
     private Blocks() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     static {
         for (Material material : Material.values()) {
-            if (!material.isBlock()) continue; // skip not blocks
+            if (!material.isBlock()) continue;
 
             FRIENDLY_MATERIAL_NAMES.put(material.name().toLowerCase(), material);
 

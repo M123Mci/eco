@@ -10,7 +10,7 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Class to check for updates of a plugin on spigot.
+ * Class to check for updates of a plugin on polymart.
  */
 public class UpdateChecker {
     /**
@@ -19,7 +19,7 @@ public class UpdateChecker {
     private final EcoPlugin plugin;
 
     /**
-     * Create an update checker for the specified spigot resource id.
+     * Create an update checker for a plugin, using its polymart resource ID.
      *
      * @param plugin The plugin to check.
      */
@@ -28,12 +28,15 @@ public class UpdateChecker {
     }
 
     /**
-     * Get the latest version of the plugin.
+     * Get the latest version of the plugin from polymart.
+     * <p>
+     * The lookup runs asynchronously. The callback is invoked, off the main thread, with the latest
+     * version string; if the request fails, a warning is logged and the callback is never invoked.
      *
      * @param callback The process to run after checking.
      */
     public void getVersion(@NotNull final Consumer<? super String> callback) {
-        this.getPlugin().getScheduler().runTaskAsync(() -> {
+        this.getPlugin().getScheduler().async().run(() -> {
             try (InputStream inputStream = new URI(
                     "https://api.polymart.org/v1/getResourceInfoSimple?key=version&resource_id=" + this.getPlugin().getResourceId()
             ).toURL().openStream();

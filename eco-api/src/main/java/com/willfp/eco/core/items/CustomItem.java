@@ -33,11 +33,11 @@ public class CustomItem implements TestableItem {
     private final ItemStack item;
 
     /**
-     * Create a new complex recipe part.
+     * Create a new custom item.
      *
      * @param key  The item key.
      * @param test The test.
-     * @param item The example ItemStacks.
+     * @param item The example ItemStack.
      */
     public CustomItem(@NotNull final NamespacedKey key,
                       @NotNull final Predicate<@NotNull ItemStack> test,
@@ -51,11 +51,11 @@ public class CustomItem implements TestableItem {
         immediately after due to registration order; so eco waits until the item should be
         working in order to check.
          */
-        Eco.get().getEcoPlugin().getScheduler().runTaskLater(1, () -> {
+        Eco.get().getEcoPlugin().getScheduler().global().runLater(() -> {
             if (!matches(getItem())) {
                 Eco.get().getEcoPlugin().getLogger().severe("Item with key " + key + " is invalid!");
             }
-        });
+        }, 1);
     }
 
     @Override

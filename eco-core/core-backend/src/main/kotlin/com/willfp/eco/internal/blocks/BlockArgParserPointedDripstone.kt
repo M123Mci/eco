@@ -4,13 +4,13 @@ import com.willfp.eco.core.blocks.args.BlockArgParseResult
 import com.willfp.eco.core.blocks.args.BlockArgParser
 import org.bukkit.block.BlockFace
 import org.bukkit.block.data.BlockData
-import org.bukkit.block.data.type.PointedDripstone
+import org.bukkit.block.data.type.Speleothem
 
 object BlockArgParserPointedDripstone : BlockArgParser {
     override fun parseArguments(args: Array<out String>, blockData: BlockData): BlockArgParseResult? {
-        val pointedDripstone = blockData as? PointedDripstone ?: return null
+        val pointedDripstone = blockData as? Speleothem ?: return null
 
-        var thickness: PointedDripstone.Thickness? = null
+        var thickness: Speleothem.Thickness? = null
         var verticalDirection: BlockFace? = null
 
         for (arg in args) {
@@ -27,7 +27,7 @@ object BlockArgParserPointedDripstone : BlockArgParser {
                     continue
                 }
                 thickness =
-                    runCatching { PointedDripstone.Thickness.valueOf(argSplit[1].uppercase()) }.getOrNull() ?: continue
+                    runCatching { Speleothem.Thickness.valueOf(argSplit[1].uppercase()) }.getOrNull() ?: continue
             }
 
         }
@@ -36,13 +36,13 @@ object BlockArgParserPointedDripstone : BlockArgParser {
 
         return BlockArgParseResult(
             {
-                val pointedDripstone = it.blockData as? PointedDripstone ?: return@BlockArgParseResult false
+                val pointedDripstone = it.blockData as? Speleothem ?: return@BlockArgParseResult false
 
                 (verticalDirection == null || pointedDripstone.verticalDirection == verticalDirection) &&
                         (thickness == null || pointedDripstone.thickness == thickness)
             },
             {
-                val pointedDripstone = it.blockData as? PointedDripstone ?: return@BlockArgParseResult
+                val pointedDripstone = it.blockData as? Speleothem ?: return@BlockArgParseResult
 
                 if (verticalDirection != null) pointedDripstone.verticalDirection = verticalDirection
                 if (thickness != null) pointedDripstone.thickness = thickness

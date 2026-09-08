@@ -3,42 +3,52 @@ package com.willfp.eco.core.placeholder;
 import com.willfp.eco.core.placeholder.context.PlaceholderContext;
 import com.willfp.eco.util.PatternUtils;
 import com.willfp.eco.util.StringUtils;
+
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A placeholder that cannot be registered, and exists purely in injection.
+ * A placeholder that requires a player, which cannot be registered and exists purely in injection.
+ * <p>
+ * If the context has no player, the placeholder resolves to null.
  */
 public final class PlayerStaticPlaceholder implements InjectablePlaceholder {
     /**
-     * The identifier.
+     * The identifier, wrapped in percent signs, e.g. "%identifier%".
      */
     private final String identifier;
 
     /**
-     * The arguments pattern.
+     * The raw identifier, used to lazily compile the pattern.
      */
-    private final Pattern pattern;
+    private final String rawIdentifier;
 
     /**
-     * The function to retrieve the output of the arguments.
+     * The placeholder pattern, lazily initialized from the raw identifier.
+     */
+    @Nullable
+    private volatile Pattern pattern = null;
+
+    /**
+     * The function to retrieve the value of the placeholder for a player.
      */
     private final Function<@NotNull Player, @Nullable String> function;
 
     /**
-     * Create a new player arguments.
+     * Create a new player static placeholder.
      *
      * @param identifier The identifier.
      * @param function   The function to retrieve the value.
      */
     public PlayerStaticPlaceholder(@NotNull final String identifier,
                                    @NotNull final Function<@NotNull Player, @Nullable String> function) {
+        this.rawIdentifier = identifier;
         this.identifier = "%" + identifier + "%";
-        this.pattern = PatternUtils.compileLiteral(identifier);
         this.function = function;
     }
 
@@ -55,10 +65,10 @@ public final class PlayerStaticPlaceholder implements InjectablePlaceholder {
     }
 
     /**
-     * Get the value of the arguments.
+     * Get the value of the placeholder for a given player.
      *
      * @param player The player.
-     * @return The value.
+     * @return The value, or an empty string if the function returned null.
      * @deprecated Use {@link #getValue(String, PlaceholderContext)} instead.
      */
     @Deprecated(since = "6.56.0", forRemoval = true)
@@ -86,7 +96,19 @@ public final class PlayerStaticPlaceholder implements InjectablePlaceholder {
     @NotNull
     @Override
     public Pattern getPattern() {
-        return this.pattern;
+        Pattern result = this.pattern;
+
+        if (result == null) {
+            synchronized (this) {
+                result = this.pattern;
+                if (result == null) {
+                    result = PatternUtils.compileLiteral(this.rawIdentifier);
+                    this.pattern = result;
+                }
+            }
+        }
+
+        return result;
     }
 
     @Override

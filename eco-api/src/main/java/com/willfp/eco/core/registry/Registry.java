@@ -28,6 +28,12 @@ public class Registry<T extends Registrable> implements Iterable<T> {
     private boolean isLocked = false;
 
     /**
+     * Cached values set, invalidated on mutation.
+     */
+    @Nullable
+    private Set<T> cachedValues = null;
+
+    /**
      * The locker, used to 'secure' registries and prevent random unlocking.
      */
     @Nullable
@@ -42,9 +48,14 @@ public class Registry<T extends Registrable> implements Iterable<T> {
 
     /**
      * Register a new element.
+     * <p>
+     * Any element already registered under the same ID is replaced. {@link Registrable#onRegister()}
+     * and {@link #onRegister(Registrable)} are called afterwards.
      *
      * @param element The element to register.
-     * @return The element.
+     * @return The element that was passed in.
+     * @throws IllegalStateException    If the registry is locked.
+     * @throws IllegalArgumentException If the element ID does not match {@code [a-z0-9_]{1,100}}.
      */
     @NotNull
     public T register(@NotNull final T element) {
@@ -55,6 +66,7 @@ public class Registry<T extends Registrable> implements Iterable<T> {
         Preconditions.checkArgument(ID_PATTERN.matcher(element.getID()).matches(), "ID must match pattern: " + ID_PATTERN.pattern() + " (was " + element.getID() + ")");
 
         registry.put(element.getID(), element);
+        this.cachedValues = null;
 
         element.onRegister();
         onRegister(element);
@@ -64,9 +76,13 @@ public class Registry<T extends Registrable> implements Iterable<T> {
 
     /**
      * Remove an element.
+     * <p>
+     * {@link Registrable#onRemove()} and {@link #onRemove(Registrable)} are called before the
+     * element is removed.
      *
      * @param element The element.
-     * @return The element.
+     * @return The element that was passed in.
+     * @throws IllegalStateException If the registry is locked.
      */
     public T remove(@NotNull final T element) {
         if (this.isLocked) {
@@ -77,6 +93,7 @@ public class Registry<T extends Registrable> implements Iterable<T> {
         onRemove(element);
 
         registry.remove(element.getID());
+        this.cachedValues = null;
 
         return element;
     }
@@ -85,7 +102,8 @@ public class Registry<T extends Registrable> implements Iterable<T> {
      * Remove an element by ID.
      *
      * @param id The ID.
-     * @return The element.
+     * @return The removed element, or null if no element was registered under that ID.
+     * @throws IllegalStateException If the registry is locked.
      */
     @Nullable
     public T remove(@NotNull final String id) {
@@ -114,7 +132,11 @@ public class Registry<T extends Registrable> implements Iterable<T> {
     }
 
     /**
-     * Clear the registry.
+     * Clear the registry, removing every element.
+     * <p>
+     * Each element is removed with {@link #remove(Registrable)}, so removal callbacks are run.
+     *
+     * @throws IllegalStateException If the registry is locked.
      */
     public void clear() {
         for (T value : Set.copyOf(registry.values())) {
@@ -124,11 +146,18 @@ public class Registry<T extends Registrable> implements Iterable<T> {
 
     /**
      * Get all elements.
+     * <p>
+     * The returned set is an immutable copy, cached until the registry is next mutated.
      *
      * @return All elements.
      */
     public Set<T> values() {
-        return Set.copyOf(registry.values());
+        Set<T> cached = this.cachedValues;
+        if (cached == null) {
+            cached = Set.copyOf(registry.values());
+            this.cachedValues = cached;
+        }
+        return cached;
     }
 
     /**
@@ -141,9 +170,12 @@ public class Registry<T extends Registrable> implements Iterable<T> {
     }
 
     /**
-     * Lock the registry.
+     * Lock the registry, preventing elements from being registered or removed.
+     * <p>
+     * Only the same locker can subsequently unlock the registry.
      *
      * @param locker The locker.
+     * @throws IllegalArgumentException If the registry is already locked with a different locker.
      */
     public void lock(@Nullable final Object locker) {
         if (this.isLocked && this.locker != locker) {
@@ -157,7 +189,8 @@ public class Registry<T extends Registrable> implements Iterable<T> {
     /**
      * Unlock the registry.
      *
-     * @param locker The locker.
+     * @param locker The locker that was used to lock the registry.
+     * @throws IllegalArgumentException If the locker is not the one used to lock the registry.
      */
     public void unlock(@Nullable final Object locker) {
         if (this.locker != locker) {

@@ -6,7 +6,7 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
-import org.bukkit.event.player.PlayerLoginEvent
+import io.papermc.paper.event.connection.configuration.PlayerConnectionInitialConfigureEvent
 import org.bukkit.event.player.PlayerQuitEvent
 
 class ProfileLoadListener(
@@ -14,18 +14,18 @@ class ProfileLoadListener(
     private val handler: ProfileHandler
 ) : Listener {
     @EventHandler(priority = EventPriority.LOWEST)
-    fun onLogin(event: PlayerLoginEvent) {
-        handler.unloadProfile(event.player.uniqueId)
+    fun onLogin(event: PlayerConnectionInitialConfigureEvent) {
+        handler.unloadPlayer(requireNotNull(event.connection.profile.id))
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     fun onLeave(event: PlayerQuitEvent) {
-        handler.unloadProfile(event.player.uniqueId)
+        handler.unloadPlayer(event.player.uniqueId)
     }
 
     @EventHandler
     fun onJoin(event: PlayerJoinEvent) {
-        plugin.scheduler.runTaskLater(5) {
+        plugin.scheduler.on(event.player).runLater(5) {
             PlayerUtils.updateSavedDisplayName(event.player)
         }
     }

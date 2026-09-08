@@ -3,33 +3,41 @@ package com.willfp.eco.core.placeholder;
 import com.willfp.eco.core.EcoPlugin;
 import com.willfp.eco.core.placeholder.context.PlaceholderContext;
 import com.willfp.eco.util.PatternUtils;
+
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A arguments that does not require a player.
+ * A placeholder that does not require a player.
  */
 public final class PlayerlessPlaceholder implements RegistrablePlaceholder {
     /**
-     * The arguments pattern.
+     * The raw identifier, used to lazily compile the pattern.
      */
-    private final Pattern pattern;
+    private final String rawIdentifier;
 
     /**
-     * The function to retrieve the output of the arguments.
+     * The placeholder pattern, lazily initialized from the raw identifier.
+     */
+    @Nullable
+    private volatile Pattern pattern = null;
+
+    /**
+     * The function to retrieve the value of the placeholder.
      */
     private final Supplier<@Nullable String> function;
 
     /**
-     * The plugin for the arguments.
+     * The plugin that owns the placeholder.
      */
     private final EcoPlugin plugin;
 
     /**
-     * Create a new player arguments.
+     * Create a new playerless placeholder.
      *
      * @param plugin     The plugin.
      * @param identifier The identifier.
@@ -39,7 +47,7 @@ public final class PlayerlessPlaceholder implements RegistrablePlaceholder {
                                  @NotNull final String identifier,
                                  @NotNull final Supplier<@Nullable String> function) {
         this.plugin = plugin;
-        this.pattern = PatternUtils.compileLiteral(identifier);
+        this.rawIdentifier = identifier;
         this.function = function;
     }
 
@@ -50,9 +58,9 @@ public final class PlayerlessPlaceholder implements RegistrablePlaceholder {
     }
 
     /**
-     * Get the value of the arguments.
+     * Get the value of the placeholder.
      *
-     * @return The value.
+     * @return The value, or an empty string if the supplier returned null.
      * @deprecated Use {@link #getValue(String, PlaceholderContext)} instead.
      */
     @Deprecated(since = "6.56.0", forRemoval = true)
@@ -72,7 +80,19 @@ public final class PlayerlessPlaceholder implements RegistrablePlaceholder {
     @NotNull
     @Override
     public Pattern getPattern() {
-        return this.pattern;
+        Pattern result = this.pattern;
+
+        if (result == null) {
+            synchronized (this) {
+                result = this.pattern;
+                if (result == null) {
+                    result = PatternUtils.compileLiteral(this.rawIdentifier);
+                    this.pattern = result;
+                }
+            }
+        }
+
+        return result;
     }
 
     @Override

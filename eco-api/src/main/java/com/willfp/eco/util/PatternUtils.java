@@ -1,9 +1,8 @@
 package com.willfp.eco.util;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.willfp.eco.core.Eco;
-import java.util.concurrent.TimeUnit;
+import com.willfp.eco.core.cache.EcoCache;
+import java.time.Duration;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 
@@ -12,16 +11,21 @@ import org.jetbrains.annotations.NotNull;
  */
 public final class PatternUtils {
     /**
-     * Cache of compiled literal patterns.
+     * Cache of compiled literal patterns, expiring after the number of minutes configured under
+     * {@code literal-cache-ttl} in eco's config since the pattern was last used.
      */
-    private static final Cache<String, Pattern> LITERAL_PATTERN_CACHE = Caffeine.newBuilder()
-            .expireAfterAccess(Eco.get().getEcoPlugin().getConfigYml().getInt("literal-cache-ttl"), TimeUnit.MINUTES)
+    private static final EcoCache<String, Pattern> LITERAL_PATTERN_CACHE = EcoCache.<String, Pattern>builder()
+            .expireAfterAccess(Duration.ofMinutes(Eco.get().getEcoPlugin().getConfigYml().getInt("literal-cache-ttl")))
             .build();
 
     /**
      * Compile a literal pattern.
+     * <p>
+     * The string is compiled with {@link Pattern#LITERAL}, so regex metacharacters in it carry no
+     * special meaning. Compiled patterns are cached and reused, so this is cheaper than calling
+     * {@link Pattern#compile(String, int)} repeatedly with the same string.
      *
-     * @param pattern The pattern.
+     * @param pattern The literal string to match.
      * @return The compiled pattern.
      */
     @NotNull

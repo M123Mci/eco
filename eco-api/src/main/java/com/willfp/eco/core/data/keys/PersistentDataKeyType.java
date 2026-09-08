@@ -5,19 +5,23 @@ import com.willfp.eco.core.data.handlers.DataTypeSerializer;
 import com.willfp.eco.core.data.handlers.PersistentDataHandler;
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * All storable data key types.
+ * <p>
+ * This is a type-safe enum-like class; instances cannot be created outside of this class,
+ * and two types are equal if they share the same name.
  *
- * @param <T> The type.
+ * @param <T> The type of the stored data.
  */
 public final class PersistentDataKeyType<T> {
     /**
      * The registered key types.
      */
-    private static final List<PersistentDataKeyType<?>> VALUES = new ArrayList<>();
+    private static final List<PersistentDataKeyType<?>> VALUES = new CopyOnWriteArrayList<>();
 
     /**
      * String.
@@ -65,7 +69,7 @@ public final class PersistentDataKeyType<T> {
     private final Map<PersistentDataHandler, DataTypeSerializer<T>> serializers = new HashMap<>();
 
     /**
-     * Create new PersistentDataKeyType.
+     * Create new PersistentDataKeyType, registering it in {@link #values()}.
      *
      * @param name The name.
      */
@@ -86,7 +90,8 @@ public final class PersistentDataKeyType<T> {
     }
 
     /**
-     * Register a serializer for this key type.
+     * Register a serializer for this key type, replacing any serializer already
+     * registered for the handler.
      *
      * @param handler    The handler.
      * @param serializer The serializer.
@@ -101,6 +106,7 @@ public final class PersistentDataKeyType<T> {
      *
      * @param handler The handler.
      * @return The serializer.
+     * @throws NoSuchElementException If no serializer has been registered for the handler.
      */
     @NotNull
     public DataTypeSerializer<T> getSerializer(@NotNull final PersistentDataHandler handler) {
@@ -141,6 +147,8 @@ public final class PersistentDataKeyType<T> {
 
     /**
      * Get a key type from a name.
+     * <p>
+     * The lookup is case-insensitive.
      *
      * @param name The name.
      * @return The type, or null if not found.

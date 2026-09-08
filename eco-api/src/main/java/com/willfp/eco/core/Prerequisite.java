@@ -1,9 +1,9 @@
 package com.willfp.eco.core;
 
 import com.willfp.eco.util.ClassUtils;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
 
@@ -17,7 +17,7 @@ public class Prerequisite {
     /**
      * All existing prerequisites are registered on creation.
      */
-    private static final List<Prerequisite> VALUES = new ArrayList<>();
+    private static final List<Prerequisite> VALUES = new CopyOnWriteArrayList<>();
 
     /**
      * Requires the server to be running an implementation of paper.
@@ -29,21 +29,15 @@ public class Prerequisite {
 
     /**
      * Requires the server to be running an implementation of Folia.
+     * <p>
+     * Probed by class name rather than by API, because eco compiles against the Spigot
+     * API and must not name a Folia type. {@code RegionizedServer} is server-side, so it
+     * is absent on Paper, unlike everything under {@code io.papermc.paper.threadedregions}
+     * that ships in the Paper API.
      */
     public static final Prerequisite HAS_FOLIA = new Prerequisite(
             () -> ClassUtils.exists("io.papermc.paper.threadedregions.RegionizedServer"),
-            "Requires server to be running Folia!"
-    );
-
-    /**
-     * Requires the server to have ProtocolLib installed.
-     *
-     * @deprecated ProtocolLib is no longer used by eco, AbstractPacketAdapter has been marked for removal since 6.77.0.
-     */
-    @Deprecated(since = "6.77.0", forRemoval = true)
-    public static final Prerequisite HAS_PROTOCOLLIB = new Prerequisite(
-            () -> ClassUtils.exists("com.comphenix.protocol.events.PacketAdapter"),
-            "Requires server to have ProtocolLib"
+            "Requires server to be running Folia (or a fork)"
     );
 
     /**
@@ -162,7 +156,7 @@ public class Prerequisite {
     private boolean isMet;
 
     /**
-     * Retrieve if the necessary prerequisite condition is met.
+     * The supplier used to retrieve if the necessary prerequisite condition is met.
      */
     private final Supplier<Boolean> isMetSupplier;
 
@@ -173,9 +167,13 @@ public class Prerequisite {
 
     /**
      * Create a prerequisite.
+     * <p>
+     * The supplier is polled immediately, and again every time {@link #update()} is called.
+     * The prerequisite is registered on creation, so it will be picked up by
+     * {@link #update()} for the lifetime of the server.
      *
-     * @param isMetSupplier An {@link Supplier<Boolean>} that returns if the prerequisite is met
-     * @param description   The description of the prerequisite, shown to the user if it isn't
+     * @param isMetSupplier A {@link Supplier} that returns if the prerequisite is met.
+     * @param description   The description of the prerequisite, shown to the user if it isn't met.
      */
     public Prerequisite(@NotNull final Supplier<Boolean> isMetSupplier,
                         @NotNull final String description) {
@@ -186,23 +184,27 @@ public class Prerequisite {
     }
 
     /**
-     * Refresh the condition set in the supplier, updates {@link this#isMet}.
+     * Refresh the condition set in the supplier, updating the value returned by
+     * {@link #isMet()}.
      */
     private void refresh() {
         this.isMet = this.isMetSupplier.get();
     }
 
     /**
-     * Update all prerequisites' {@link Prerequisite#isMet}.
+     * Re-evaluate every registered prerequisite, updating the value returned by
+     * {@link #isMet()} for each of them.
      */
     public static void update() {
         VALUES.forEach(Prerequisite::refresh);
     }
 
     /**
-     * Check if all prerequisites in array are met.
+     * Check if all prerequisites in an array are met.
+     * <p>
+     * Calls {@link #update()} first, so the result is always up to date.
      *
-     * @param prerequisites A primitive array of prerequisites to check.
+     * @param prerequisites The prerequisites to check.
      * @return If all the prerequisites are met.
      */
     public static boolean areMet(@NotNull final Prerequisite[] prerequisites) {

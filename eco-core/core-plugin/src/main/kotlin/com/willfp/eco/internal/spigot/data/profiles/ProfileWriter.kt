@@ -28,24 +28,23 @@ class ProfileWriter(
     }
 
     fun startTickingSaves() {
-        plugin.scheduler.runTaskTimer(20, saveInterval) {
-            val iterator = valuesToWrite.iterator()
+        plugin.scheduler.global().runTimer(20, saveInterval) {
+            flush()
+        }
+    }
 
-            while (iterator.hasNext()) {
-                val (request, value) = iterator.next()
-                iterator.remove()
-
-                val dataHandler = if (request.key.isSavedLocally) handler.localHandler else handler.defaultHandler
-
-                // Pass the value to the data handler
-                @Suppress("UNCHECKED_CAST")
-                dataHandler.write(request.uuid, request.key as PersistentDataKey<Any>, value)
-            }
+    fun flush() {
+        for ((request, value) in valuesToWrite) {
+            // 仅移除本次读取的值，不能丢弃异步调用刚写入的新值。
+            if (!valuesToWrite.remove(request, value)) continue
+            val dataHandler = if (request.key.isSavedLocally) handler.localHandler else handler.defaultHandler
+            @Suppress("UNCHECKED_CAST")
+            dataHandler.write(request.uuid, request.key as PersistentDataKey<Any>, value)
         }
     }
 
     fun startTickingAutosave() {
-        plugin.scheduler.runTaskTimer(autosaveInterval, autosaveInterval) {
+        plugin.scheduler.global().runTimer(autosaveInterval, autosaveInterval) {
             if (handler.localHandler.shouldAutosave()) {
                 handler.localHandler.save()
             }

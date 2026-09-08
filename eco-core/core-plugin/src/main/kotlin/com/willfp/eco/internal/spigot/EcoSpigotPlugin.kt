@@ -14,13 +14,15 @@ import com.willfp.eco.core.integrations.customblocks.CustomBlocksManager
 import com.willfp.eco.core.integrations.customentities.CustomEntitiesManager
 import com.willfp.eco.core.integrations.customitems.CustomItemsManager
 import com.willfp.eco.core.integrations.economy.EconomyManager
-import com.willfp.eco.core.integrations.hologram.HologramManager
+import com.willfp.eco.core.integrations.discord.DiscordManager
+import com.willfp.eco.internal.discord.DiscordIntegrationImpl
 import com.willfp.eco.core.integrations.mcmmo.McmmoManager
 import com.willfp.eco.core.integrations.placeholder.PlaceholderManager
 import com.willfp.eco.core.integrations.shop.ShopManager
 import com.willfp.eco.core.items.Items
 import com.willfp.eco.core.packet.PacketListener
 import com.willfp.eco.core.particle.Particles
+import com.willfp.eco.core.price.PriceFactory
 import com.willfp.eco.core.price.Prices
 import com.willfp.eco.core.recipe.Recipes
 import com.willfp.eco.internal.blocks.BlockArgParserAgeable
@@ -76,6 +78,7 @@ import com.willfp.eco.internal.blocks.BlockArgParserTripwire
 import com.willfp.eco.internal.blocks.BlockArgParserWall
 import com.willfp.eco.internal.blocks.BlockArgParserWaterlogged
 import com.willfp.eco.internal.blocks.tags.VanillaBlockTags
+import com.willfp.eco.internal.entities.tags.VanillaEntityTags
 import com.willfp.eco.internal.data.MavenVersionToStringAdapter
 import com.willfp.eco.internal.data.VersionToStringAdapter
 import com.willfp.eco.internal.entities.EntityArgParserAdult
@@ -97,6 +100,7 @@ import com.willfp.eco.internal.entities.EntityArgParserNoAI
 import com.willfp.eco.internal.entities.EntityArgParserScale
 import com.willfp.eco.internal.entities.EntityArgParserSilent
 import com.willfp.eco.internal.entities.EntityArgParserSize
+import com.willfp.eco.internal.entities.EntityArgParserTamed
 import com.willfp.eco.internal.entities.EntityArgParserSpawnReinforcements
 import com.willfp.eco.internal.entities.EntityArgParserSpeed
 import com.willfp.eco.internal.items.ArgParserAttribute
@@ -121,16 +125,21 @@ import com.willfp.eco.internal.items.ArgParserTexture
 import com.willfp.eco.internal.items.ArgParserTooltipStyle
 import com.willfp.eco.internal.items.ArgParserTrim
 import com.willfp.eco.internal.items.ArgParserUnbreakable
+import com.willfp.eco.internal.items.ArgParserUnenchantable
 import com.willfp.eco.internal.items.tags.VanillaItemTags
 import com.willfp.eco.internal.lookup.SegmentParserGroup
 import com.willfp.eco.internal.lookup.SegmentParserUseIfPresent
+import com.willfp.eco.internal.particle.ParticleFactoryDustTransition
+import com.willfp.eco.internal.particle.ParticleFactoryEntityEffect
 import com.willfp.eco.internal.particle.ParticleFactoryRGB
 import com.willfp.eco.internal.price.PriceFactoryEconomy
 import com.willfp.eco.internal.price.PriceFactoryXP
 import com.willfp.eco.internal.price.PriceFactoryXPLevels
+import com.willfp.eco.internal.spigot.anvil.AnvilMechanicsListener
 import com.willfp.eco.internal.spigot.arrows.ArrowDataListener
 import com.willfp.eco.internal.spigot.data.DataYml
 import com.willfp.eco.internal.spigot.data.PlayerBlockListener
+import com.willfp.eco.internal.spigot.dragdrop.DragAndDropShellListener
 import com.willfp.eco.internal.spigot.data.profiles.ProfileHandler
 import com.willfp.eco.internal.spigot.data.profiles.ProfileLoadListener
 import com.willfp.eco.internal.spigot.drops.CollatedRunnable
@@ -139,10 +148,12 @@ import com.willfp.eco.internal.spigot.eventlisteners.EntityDeathByEntityListener
 import com.willfp.eco.internal.spigot.eventlisteners.NaturalExpGainListenersPaper
 import com.willfp.eco.internal.spigot.eventlisteners.NaturalExpGainListenersSpigot
 import com.willfp.eco.internal.spigot.eventlisteners.PlayerHealthPatch
+import com.willfp.eco.internal.spigot.eventlisteners.UnenchantablePatch
 import com.willfp.eco.internal.spigot.eventlisteners.PlayerJumpListenersPaper
 import com.willfp.eco.internal.spigot.eventlisteners.PlayerJumpListenersSpigot
 import com.willfp.eco.internal.spigot.eventlisteners.armor.ArmorChangeEventListeners
 import com.willfp.eco.internal.spigot.eventlisteners.armor.ArmorListener
+import com.willfp.eco.internal.spigot.eventlisteners.armor.ArmorListenerPaper
 import com.willfp.eco.internal.spigot.gui.GUIListener
 import com.willfp.eco.internal.spigot.integrations.afk.AFKIntegrationCMI
 import com.willfp.eco.internal.spigot.integrations.afk.AFKIntegrationEssentials
@@ -154,6 +165,7 @@ import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefGriefPreve
 import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefHuskClaims
 import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefHuskTowns
 import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefIridiumSkyblock
+import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefResidence
 import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefSuperiorSkyblock2
 import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefTowny
 import com.willfp.eco.internal.spigot.integrations.antigrief.AntigriefWorldGuard
@@ -171,10 +183,6 @@ import com.willfp.eco.internal.spigot.integrations.customitems.CustomItemsNexo
 import com.willfp.eco.internal.spigot.integrations.customitems.CustomItemsScyther
 import com.willfp.eco.internal.spigot.integrations.economy.EconomyVault
 import com.willfp.eco.internal.spigot.integrations.entitylookup.EntityLookupModelEngine
-import com.willfp.eco.internal.spigot.integrations.hologram.HologramCMI
-import com.willfp.eco.internal.spigot.integrations.hologram.HologramDecentHolograms
-import com.willfp.eco.internal.spigot.integrations.hologram.HologramFancyHolograms
-import com.willfp.eco.internal.spigot.integrations.hologram.HologramHolographicDisplays
 import com.willfp.eco.internal.spigot.integrations.mcmmo.McmmoIntegrationImpl
 import com.willfp.eco.internal.spigot.integrations.placeholder.PlaceholderIntegrationPAPI
 import com.willfp.eco.internal.spigot.integrations.price.PriceFactoryCoinsEngine
@@ -190,19 +198,55 @@ import com.willfp.eco.internal.spigot.recipes.listeners.ComplexInComplex
 import com.willfp.eco.internal.spigot.recipes.listeners.ComplexInVanilla
 import com.willfp.eco.internal.spigot.recipes.stackhandlers.ShapedCraftingRecipeStackHandler
 import com.willfp.eco.internal.spigot.recipes.stackhandlers.ShapelessCraftingRecipeStackHandler
+import com.willfp.eco.internal.spigot.recipes.workstation.BrewingPacketHandler
+import com.willfp.eco.internal.spigot.recipes.workstation.GrindstonePacketHandler
+import com.willfp.eco.internal.spigot.recipes.workstation.WorkstationRecipeListener
 import com.willfp.eco.util.ClassUtils
 import net.kyori.adventure.platform.bukkit.BukkitAudiences
 import net.milkbowl.vault.economy.Economy
+import com.willfp.eco.internal.spigot.datapack.DatapackRegistry
+import com.willfp.eco.internal.spigot.proxies.DatapackCodecProxy
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.event.Listener
 import org.bukkit.inventory.ItemStack
 import su.nightexpress.excellenteconomy.api.ExcellentEconomyAPI
 
+/**
+ * The base eco plugin, containing everything shared between platform implementations.
+ */
 abstract class EcoSpigotPlugin : EcoPlugin() {
+    /**
+     * data.yml, where eco stores its internal data.
+     */
     abstract val dataYml: DataYml
+
+    /**
+     * The handler responsible for loading and saving player profiles.
+     */
     abstract val profileHandler: ProfileHandler
+
+    /**
+     * The adventure audience provider, only present on servers without native adventure support.
+     */
     protected var bukkitAudiences: BukkitAudiences? = null
+
+    /**
+     * The brewing packet handler, registered as both a listener and a packet listener.
+     */
+    private val brewingPacketHandler = BrewingPacketHandler(this)
+
+    /**
+     * Owns every plugin's datapack, and all the timing decisions around them.
+     */
+    val datapackRegistry: DatapackRegistry by lazy {
+        DatapackRegistry(
+            logger = this.logger,
+            dataYml = this.dataYml,
+            saveData = { this.dataYml.save() },
+            proxyProvider = { this.getProxy(DatapackCodecProxy::class.java) }
+        )
+    }
 
     init {
         Items.registerArgParser(ArgParserEnchantment)
@@ -227,6 +271,7 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
         Items.registerArgParser(ArgParserTooltipStyle)
         Items.registerArgParser(ArgParserTrim)
         Items.registerArgParser(ArgParserAttribute)
+        Items.registerArgParser(ArgParserUnenchantable)
 
         Blocks.registerArgParser(BlockArgParserAgeable)
         Blocks.registerArgParser(BlockArgParserAnaloguePowerable)
@@ -295,6 +340,7 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
         Entities.registerArgParser(EntityArgParserSpeed)
         Entities.registerArgParser(EntityArgParserBaby)
         Entities.registerArgParser(EntityArgParserAdult)
+        Entities.registerArgParser(EntityArgParserTamed)
         Entities.registerArgParser(EntityArgParserCharged)
         Entities.registerArgParser(EntityArgParserExplosionRadius)
         Entities.registerArgParser(EntityArgParserSilent)
@@ -303,11 +349,13 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
         Entities.registerArgParser(EntityArgParserScale)
         Entities.registerArgParser(EntityArgParserFirework)
 
-        Prices.registerPriceFactory(PriceFactoryEconomy)
-        Prices.registerPriceFactory(PriceFactoryXPLevels)
-        Prices.registerPriceFactory(PriceFactoryXP)
+        Prices.registerDefaultPriceFactory(PriceFactoryEconomy)
+        Prices.registerDefaultPriceFactory(PriceFactoryXPLevels)
+        Prices.registerDefaultPriceFactory(PriceFactoryXP)
 
         Particles.registerParticleFactory(ParticleFactoryRGB)
+        Particles.registerParticleFactory(ParticleFactoryDustTransition)
+        Particles.registerParticleFactory(ParticleFactoryEntityEffect)
 
         CraftingRecipeListener.registerListener(ComplexInComplex)
         CraftingRecipeListener.registerListener(ComplexInVanilla)
@@ -334,8 +382,14 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
         if (ClassUtils.exists(className)) {
             ExternalDataStore.registerAdapter(MavenVersionToStringAdapter(className))
         }
+
+        // Register internal Discord webhook integration
+        DiscordManager.register(DiscordIntegrationImpl(this))
     }
 
+    /**
+     * Warn about conflicting plugins, then enable everything that requires a running server.
+     */
     override fun handleEnable() {
         this.logger.info("Scanning for conflicts...")
         val conflicts = ConflictFinder.searchForConflicts(this)
@@ -378,9 +432,18 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
         // Init vanilla tags
         VanillaItemTags.register()
         VanillaBlockTags.register()
+        VanillaEntityTags.register()
+
+        // Worlds are loaded by now, so anything already published is committed to.
+        this.datapackRegistry.onWorldsLoaded()
+        this.datapackRegistry.handleOrphanedPacks(this.configYml.getBool("datapacks.remove-orphaned"))
     }
 
+    /**
+     * Shut down integrations and flush player data to storage.
+     */
     override fun handleDisable() {
+        DiscordManager.shutdown()
         this.logger.info("Saving player data...")
         val start = System.currentTimeMillis()
         profileHandler.save()
@@ -388,6 +451,9 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
         Eco.get().adventure?.close()
     }
 
+    /**
+     * Start the collated runnable, and check recipe batching if no profile migration is pending.
+     */
     override fun createTasks() {
         CollatedRunnable(this)
 
@@ -396,7 +462,7 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
             profileHandler.profileWriter.startTickingSaves()
         }
 
-        this.scheduler.runTaskTimer(
+        this.scheduler.global().runTimer(
             this.configYml.getInt("display-frame-ttl").toLong(),
             this.configYml.getInt("display-frame-ttl").toLong(),
         ) { getProxy(PacketHandlerProxy::class.java).clearDisplayFrames() }
@@ -405,11 +471,14 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
             PlayerflowHandler(this.scheduler).startTicking()
         }
 
-        this.scheduler.runTaskTimer(1L, 20L) {
+        this.scheduler.global().runTimer(1L, 20L) {
             Recipes.checkBatching()
         }
     }
 
+    /**
+     * Register custom content from other plugins, once every plugin has loaded.
+     */
     override fun handleAfterLoad() {
         CustomItemsManager.registerAllItems()
         CustomBlocksManager.registerAllBlocks()
@@ -417,6 +486,11 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
         ShopManager.registerEcoProvider()
     }
 
+    /**
+     * Get the loaders for every plugin eco integrates with.
+     *
+     * @return The integration loaders.
+     */
     override fun loadIntegrationLoaders(): List<IntegrationLoader> {
         return listOf(
             // 本地维护版暂不编译缺少私有/闭源 API 的可选集成。
@@ -429,6 +503,7 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
             IntegrationLoader("GriefPrevention") { AntigriefManager.register(AntigriefGriefPrevention()) },
             IntegrationLoader("FactionsUUID") { AntigriefManager.register(AntigriefFactionsUUID()) },
             IntegrationLoader("Towny") { AntigriefManager.register(AntigriefTowny()) },
+            IntegrationLoader("Residence") { AntigriefManager.register(AntigriefResidence()) },
             IntegrationLoader("HuskTowns") { AntigriefManager.register(AntigriefHuskTowns()) },
             IntegrationLoader("HuskClaims") { AntigriefManager.register(AntigriefHuskClaims()) },
             IntegrationLoader("FabledSkyblock") { AntigriefManager.register(AntigriefFabledSkyBlock()) },
@@ -460,13 +535,6 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
             IntegrationLoader("DeluxeSellwands") { ShopManager.register(ShopDeluxeSellwands()) },
             IntegrationLoader("ExcellentShop") { ShopManager.register(ShopExcellentShop()) },
 
-            // Hologram
-            IntegrationLoader("HolographicDisplays") { HologramManager.register(HologramHolographicDisplays(this)) },
-            IntegrationLoader("CMI") { HologramManager.register(HologramCMI()) },
-            IntegrationLoader("DecentHolograms") { HologramManager.register(HologramDecentHolograms()) },
-            //IntegrationLoader("GHolo") { HologramManager.register(HologramGHolo()) },
-            IntegrationLoader("FancyHolograms") { HologramManager.register(HologramFancyHolograms()) },
-
             // AFK
             IntegrationLoader("Essentials") { AFKManager.register(AFKIntegrationEssentials()) },
             IntegrationLoader("CMI") { AFKManager.register(AFKIntegrationCMI()) },
@@ -481,15 +549,8 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
 
             // Price
             IntegrationLoader("PlayerPoints") { Prices.registerPriceFactory(PriceFactoryPlayerPoints()) },
-            IntegrationLoader("CoinsEngine") {
-                val rsp = Bukkit.getServer().servicesManager.getRegistration(ExcellentEconomyAPI::class.java)
-                if (rsp != null) {
-                    val api = rsp.provider
-                    for (currency in api.currencies) {
-                        Prices.registerPriceFactory(PriceFactoryCoinsEngine(api, currency))
-                    }
-                }
-            },
+            IntegrationLoader("ExcellentEconomy") { registerEconomyCurrencies() },
+            IntegrationLoader("CoinsEngine") { registerEconomyCurrencies() },
 
             // Placeholder
             IntegrationLoader("PlaceholderAPI") { PlaceholderManager.addIntegration(PlaceholderIntegrationPAPI()) },
@@ -500,25 +561,56 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
         )
     }
 
+    /**
+     * Register a currency price factory, skipping it if its name is already taken by another
+     * factory, so that one clashing currency doesn't stop the rest from loading.
+     */
+    private fun registerEconomyCurrencies() {
+        val api = Bukkit.getServicesManager().getRegistration(ExcellentEconomyAPI::class.java)?.provider ?: return
+        for (currency in api.currencies) {
+            registerCurrency(PriceFactoryCoinsEngine(api, currency))
+        }
+    }
+
+    private fun registerCurrency(factory: PriceFactory) {
+        try {
+            Prices.registerPriceFactory(factory)
+        } catch (e: IllegalStateException) {
+            this.logger.warning(e.message)
+        }
+    }
+
+    /**
+     * Get the listeners to register, including the paper or spigot specific variants.
+     *
+     * @return The listeners.
+     */
     override fun loadListeners(): List<Listener> {
         val listeners = mutableListOf(
+            AnvilMechanicsListener(this),
+            DragAndDropShellListener(),
             ArmorListener(),
             EntityDeathByEntityListeners(this),
             CraftingRecipeListener(this),
             StackedRecipeListener(this),
+            WorkstationRecipeListener(this),
+            brewingPacketHandler,
             GUIListener(this),
             ArrowDataListener(this),
             ArmorChangeEventListeners(this),
             ProfileLoadListener(this, profileHandler),
             PlayerBlockListener(this),
             ServerLocking,
+            OutdatedPlugins,
             AutocrafterPatch,
-            PlayerHealthPatch
+            PlayerHealthPatch,
+            UnenchantablePatch
         )
 
         if (Prerequisite.HAS_PAPER.isMet) {
             listeners.add(PlayerJumpListenersPaper())
             listeners.add(NaturalExpGainListenersPaper())
+            listeners.add(ArmorListenerPaper())
         } else {
             listeners.add(PlayerJumpListenersSpigot())
             listeners.add(NaturalExpGainListenersSpigot())
@@ -527,7 +619,13 @@ abstract class EcoSpigotPlugin : EcoPlugin() {
         return listeners
     }
 
+    /**
+     * Get the packet listeners to register, including those provided by the NMS proxy.
+     *
+     * @return The packet listeners.
+     */
     override fun loadPacketListeners(): List<PacketListener> {
-        return this.getProxy(PacketHandlerProxy::class.java).getPacketListeners(this)
+        return this.getProxy(PacketHandlerProxy::class.java).getPacketListeners(this) +
+            listOf(brewingPacketHandler, GrindstonePacketHandler(this))
     }
 }

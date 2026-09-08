@@ -1,9 +1,9 @@
 package com.willfp.eco.core.recipe;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.willfp.eco.core.cache.EcoCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Maps;
 import com.willfp.eco.core.Eco;
 import com.willfp.eco.core.EcoPlugin;
 import com.willfp.eco.core.items.Items;
@@ -14,8 +14,11 @@ import com.willfp.eco.core.recipe.recipes.ShapedCraftingRecipe;
 import com.willfp.eco.core.recipe.recipes.ShapelessCraftingRecipe;
 import com.willfp.eco.util.NamespacedKeyUtils;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.HumanEntity;
+import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.jetbrains.annotations.NotNull;
@@ -23,22 +26,26 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Utility class to manage and register crafting recipes.
+ * <p>
+ * Recipes are identified by a {@link NamespacedKey} whose namespace is the ID of the
+ * {@link EcoPlugin} that owns them, and whose key is the (lowercased) recipe key. Every
+ * {@link CraftingRecipe} additionally owns a {@code <namespace>:<key>_displayed} key, used
+ * for the recipe-book copy of the recipe that shows the real display items.
  */
 public final class Recipes {
 
     /**
      * Registry of all recipes.
      */
-    private static final BiMap<NamespacedKey, CraftingRecipe> RECIPES = HashBiMap.create();
+    private static final BiMap<NamespacedKey, CraftingRecipe> RECIPES =
+            Maps.synchronizedBiMap(HashBiMap.<NamespacedKey, CraftingRecipe>create());
 
     /**
      * Cached recipes from matrix.
      */
-    private static final LoadingCache<ItemStack[], Optional<CraftingRecipe>> RECIPES_FROM_MATRIX = Caffeine.newBuilder()
-            .maximumSize(2048L)
-            .build(
-                    matrix -> RECIPES.values().stream().filter(recipe -> recipe.test(matrix)).findFirst()
-            );
+    private static final EcoCache<ItemStack[], Optional<CraftingRecipe>> RECIPES_FROM_MATRIX = EcoCache.<ItemStack[], Optional<CraftingRecipe>>builder()
+            .maxSize(2048)
+            .build(matrix -> RECIPES.values().stream().filter(recipe -> recipe.test(matrix)).findFirst());
 
     /**
      * Variable representing timestamp at which last recipe was scheduled for registration.
@@ -47,7 +54,11 @@ public final class Recipes {
     private static long lastScheduledRegistration = 0L;
 
     /**
-     * Register a recipe.
+     * Register a recipe in eco's own recipe registry, replacing any recipe already
+     * registered under the same key.
+     * <p>
+     * This does not register anything with Bukkit; use {@link CraftingRecipe#register()}
+     * to register a recipe both here and with the server.
      *
      * @param recipe The recipe.
      */
@@ -73,6 +84,10 @@ public final class Recipes {
 
     /**
      * Get recipe by key.
+     * <p>
+     * If no recipe is registered under the key and the key ends with (or contains)
+     * {@code _displayed}, the lookup is retried against the same key with
+     * {@code _displayed} stripped, so a displayed recipe key resolves to its owner.
      *
      * @param key The key.
      * @return The recipe, or null if not found.
@@ -97,13 +112,17 @@ public final class Recipes {
     }
 
     /**
-     * Create and register recipe.
+     * Create and register a shaped recipe.
+     * <p>
+     * Equivalent to calling
+     * {@link #createAndRegisterRecipe(EcoPlugin, String, ItemStack, List, String, boolean)}
+     * with no permission and {@code shapeless} set to false.
      *
      * @param plugin        The plugin.
      * @param key           The key.
      * @param output        The output.
-     * @param recipeStrings The recipe.
-     * @return The recipe.
+     * @param recipeStrings The nine {@link Items#lookup(String)} strings, one per matrix slot.
+     * @return The registered recipe, or null if it was invalid and therefore not registered.
      */
     public static CraftingRecipe createAndRegisterRecipe(@NotNull final EcoPlugin plugin,
                                                          @NotNull final String key,
@@ -113,15 +132,23 @@ public final class Recipes {
     }
 
     /**
-     * Create and register recipe.
+     * Create and register a recipe from {@link Items#lookup(String)} strings.
+     * <p>
+     * The recipe is built, {@link CraftingRecipe#register() registered}, and returned. It is
+     * keyed as {@code <plugin id>:<key>}, with the key lowercased.
+     * <p>
+     * Nothing is registered and null is returned (with a warning logged to the plugin) if the
+     * recipe is invalid: a shapeless recipe with no valid ingredients, a shaped recipe whose
+     * list does not contain exactly nine entries, or a shaped recipe consisting only of air or
+     * unrecognised items.
      *
      * @param plugin        The plugin.
      * @param key           The key.
      * @param output        The output.
      * @param recipeStrings The recipe strings (shaped or shapeless depending on flag).
-     * @param permission    Optional permission required to craft.
-     * @param shapeless     If true, treat as shapeless recipe (flat list). If false or omitted, treat as shaped (9 positions).
-     * @return The recipe, or null if invalid.
+     * @param permission    Optional permission required to craft, or null for none. Blank strings are ignored.
+     * @param shapeless     If true, treat as shapeless recipe (flat list). If false, treat as shaped (9 positions).
+     * @return The registered recipe, or null if invalid.
      */
     @Nullable
     public static CraftingRecipe createAndRegisterRecipe(@NotNull final EcoPlugin plugin,
@@ -138,7 +165,7 @@ public final class Recipes {
             ShapelessCraftingRecipe.Builder builder = ShapelessCraftingRecipe.builder(plugin, key)
                     .setOutput(output);
 
-            if (permission != null) {
+            if (permission != null && !permission.isBlank()) {
                 builder.setPermission(permission);
             }
 
@@ -157,7 +184,7 @@ public final class Recipes {
 
             if (!hasValid) {
                 plugin.getLogger().warning("Shapeless recipe " + plugin.getID() + ":" + key +
-                        " has no valid ingredients — not registered.");
+                        " has no valid ingredients - not registered.");
                 return null;
             }
 
@@ -168,14 +195,14 @@ public final class Recipes {
             // Shaped: exactly 9 positions
             if (recipeStrings.size() != 9) {
                 plugin.getLogger().warning("Shaped recipe " + plugin.getID() + ":" + key +
-                        " has " + recipeStrings.size() + " ingredients — expected exactly 9.");
+                        " has " + recipeStrings.size() + " ingredients - expected exactly 9.");
                 return null;
             }
 
             ShapedCraftingRecipe.Builder builder = ShapedCraftingRecipe.builder(plugin, key)
                     .setOutput(output);
 
-            if (permission != null) {
+            if (permission != null && !permission.isBlank()) {
                 builder.setPermission(permission);
             }
 
@@ -185,7 +212,7 @@ public final class Recipes {
 
             if (builder.isAir()) {
                 plugin.getLogger().warning("Shaped recipe " + plugin.getID() + ":" + key +
-                        " consists only of air or invalid items — not registered.");
+                        " consists only of air or invalid items - not registered.");
                 return null;
             }
 
@@ -196,14 +223,18 @@ public final class Recipes {
     }
 
     /**
-     * Create and register recipe.
+     * Create and register a recipe with no permission requirement.
+     * <p>
+     * Equivalent to calling
+     * {@link #createAndRegisterRecipe(EcoPlugin, String, ItemStack, List, String, boolean)}
+     * with a null permission.
      *
      * @param plugin        The plugin.
      * @param key           The key.
      * @param output        The output.
      * @param recipeStrings The recipe strings (shaped or shapeless depending on flag).
-     * @param shapeless     If true, treat as shapeless recipe (flat list). If false or omitted, treat as shaped (9 positions).
-     * @return The recipe, or null if invalid.
+     * @param shapeless     If true, treat as shapeless recipe (flat list). If false, treat as shaped (9 positions).
+     * @return The registered recipe, or null if invalid.
      */
     @Nullable
     public static CraftingRecipe createAndRegisterRecipe(@NotNull final EcoPlugin plugin,
@@ -215,14 +246,18 @@ public final class Recipes {
     }
 
     /**
-     * Create and register recipe.
+     * Create and register a shaped recipe with a permission requirement.
+     * <p>
+     * Equivalent to calling
+     * {@link #createAndRegisterRecipe(EcoPlugin, String, ItemStack, List, String, boolean)}
+     * with {@code shapeless} set to false.
      *
      * @param plugin        The plugin.
      * @param key           The key.
      * @param output        The output.
-     * @param recipeStrings The recipe.
-     * @param permission    Optional permission required to craft.
-     * @return The recipe.
+     * @param recipeStrings The nine {@link Items#lookup(String)} strings, one per matrix slot.
+     * @param permission    Optional permission required to craft, or null for none.
+     * @return The registered recipe, or null if invalid.
      */
     @Nullable
     public static CraftingRecipe createAndRegisterRecipe(@NotNull final EcoPlugin plugin,
@@ -235,7 +270,11 @@ public final class Recipes {
 
     /**
      * Schedule a Bukkit recipe for registration, batching it with others if within a short time frame.
-     * @param recipe the recipe
+     * <p>
+     * The recipe is added to the server immediately, but the recipe update is not resent to
+     * clients until {@link #checkBatching()} or {@link #forceResendRecipeUpdates()} runs.
+     *
+     * @param recipe The recipe.
      */
     public static void scheduleBukkitRecipeRegistration(@NotNull final Recipe recipe) {
         Eco.get().addBukkitRecipeNoResend(recipe);
@@ -244,8 +283,12 @@ public final class Recipes {
 
     /**
      * Schedule a Bukkit recipe for removal, batching it with others if within a short time frame.
-     * @param key the recipe key
-     * @return true if the recipe was found and scheduled for removal, false if not found
+     * <p>
+     * The recipe is removed from the server immediately, but the recipe update is not resent to
+     * clients until {@link #checkBatching()} or {@link #forceResendRecipeUpdates()} runs.
+     *
+     * @param key The recipe key.
+     * @return True if the recipe was found and removed, false if not found.
      */
     public static boolean scheduleBukkitRecipeRemoval(@NotNull final NamespacedKey key) {
         var result = Eco.get().removeBukkitRecipeNoResend(key);
@@ -256,7 +299,7 @@ public final class Recipes {
     }
 
     /**
-     * Force resend recipe updates to clients
+     * Force resend recipe updates to clients.
      */
     public static void forceResendRecipeUpdates() {
         Eco.get().reloadBukkitRecipes();
@@ -264,6 +307,9 @@ public final class Recipes {
 
     /**
      * Check if it's been a while since the last recipe registration, and if so, force resend recipe updates to clients.
+     * <p>
+     * Does nothing if nothing is pending, or if the last scheduled registration or removal was
+     * less than three seconds ago.
      */
     public static void checkBatching() {
         if (lastScheduledRegistration == 0L) {
@@ -277,6 +323,75 @@ public final class Recipes {
         }
     }
 
+    /**
+     * Cancel a {@link CraftItemEvent} that matched a vanilla recipe and
+     * manually deliver a custom output instead. Use when an eco recipe
+     * shares its shape/material with a vanilla recipe and Bukkit picked the
+     * vanilla one (e.g. a custom iron sword colliding with the vanilla iron
+     * pickaxe shape): the event fires with {@code event.getRecipe()} pointing
+     * at the vanilla recipe, so vanilla would deliver the wrong item.
+     *
+     * <p>This method:
+     * <ol>
+     *   <li>Cancels the event so vanilla does not deliver or consume.</li>
+     *   <li>Decrements every non-empty crafting matrix slot by one.</li>
+     *   <li>Places {@code item} on the player's cursor (or stacks onto the
+     *       existing cursor item where possible), shift-click delivers via
+     *       {@code player.getInventory().addItem(item)} with any overflow
+     *       dropped at the player's feet.</li>
+     * </ol>
+     *
+     * <p>Single-iteration: even for a shift-click this only consumes one grid
+     * worth of ingredients and delivers the {@code item} stack as supplied.
+     *
+     * @param event The CraftItemEvent to take over.
+     * @param item  The item stack to deliver to the player.
+     */
+    public static void takeOverCraftItem(@NotNull final CraftItemEvent event,
+                                         @NotNull final ItemStack item) {
+        event.setCancelled(true);
+
+        ItemStack[] matrix = event.getInventory().getMatrix();
+        for (int i = 0; i < matrix.length; i++) {
+            ItemStack stack = matrix[i];
+            if (stack == null || stack.getType().isAir()) {
+                continue;
+            }
+            if (stack.getAmount() <= 1) {
+                matrix[i] = null;
+            } else {
+                stack.setAmount(stack.getAmount() - 1);
+            }
+        }
+        event.getInventory().setMatrix(matrix);
+
+        HumanEntity player = event.getWhoClicked();
+
+        if (event.isShiftClick()) {
+            Map<Integer, ItemStack> overflow = player.getInventory().addItem(item);
+            overflow.values().forEach(drop ->
+                    player.getWorld().dropItemNaturally(player.getLocation(), drop));
+            return;
+        }
+
+        ItemStack cursor = event.getCursor();
+        if (cursor == null || cursor.getType().isAir()) {
+            player.setItemOnCursor(item);
+        } else if (cursor.isSimilar(item) && cursor.getAmount() + item.getAmount() <= item.getMaxStackSize()) {
+            cursor.setAmount(cursor.getAmount() + item.getAmount());
+            player.setItemOnCursor(cursor);
+        } else {
+            Map<Integer, ItemStack> overflow = player.getInventory().addItem(item);
+            overflow.values().forEach(drop ->
+                    player.getWorld().dropItemNaturally(player.getLocation(), drop));
+        }
+    }
+
+    /**
+     * This class cannot be instantiated.
+     *
+     * @throws UnsupportedOperationException Always.
+     */
     private Recipes() {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }

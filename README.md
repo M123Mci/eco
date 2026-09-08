@@ -1,145 +1,30 @@
-# eco
-eco is a powerful Spigot plugin framework that simplifies the process of plugin creation and supercharges
-your plugins.
-It's the engine behind [EcoEnchants](https://polymart.org/resource/490), [Reforges](https://polymart.org/resource/1330),
-[EcoItems](https://polymart.org/resource/1247), [EcoSkills](https://polymart.org/resource/1351),
-[EcoArmor](https://polymart.org/resource/687), [Talismans](https://polymart.org/resource/611),
-and many more.
+# eco（MagicRealms 维护版）
 
-<p>
-    <a href="https://github.com/Auxilor/eco/releases">
-        <img alt="spigot" src="https://img.shields.io/github/v/release/Auxilor/eco?color=informational"/>
-    </a>
-    <a href="https://bstats.org/plugin/bukkit/EcoEnchants" alt="bstats servers">
-        <img src="https://img.shields.io/bstats/servers/7666?color=informational"/>
-    </a>
-    <a href="https://bstats.org/plugin/bukkit/EcoEnchants" alt="bstats players">
-        <img src="https://img.shields.io/bstats/players/7666?color=informational"/>
-    </a>
-    <a href="https://discord.gg/ZcwpSsE/" alt="Discord">
-        <img src="https://img.shields.io/discord/452518336627081236?label=discord&color=informational"/>
-    </a>
-    <a href="https://github.com/Auxilor/eco/actions/workflows/java-ci.yml" alt="Latest Dev Build">
-        <img src="https://img.shields.io/github/actions/workflow/status/Auxilor/eco/java-ci.yml?branch=develop&color=informational"/>
-    </a>
-</p>
+面向 **Java 25、Paper 26.2** 的 eco 插件框架，保留物品显示、配方、数据存储、调度和接管版联动接口。本版仅包含一个 v26_2 NMS 实现，不支持旧游戏版本。
 
-eco comes packed with all the tools you need in your plugins:
+采用官方 [Auxilor/eco](https://github.com/Auxilor/eco) 的 2026.36 源码，并以 7.4.0 对照基线逐项迁入接管改动。源码提交、行为差异和验收记录见 [迁移记录](docs/26.2-migration.md)。
 
-- Modern command API
-- Native color parsing with full hex/RGB/MiniMessage support
-- Yaml/JSON/TOML config system
-- Persistent data storage API with Yaml/MySQL/MongoDB support
-- Packet item display system
-- Lightweight event loop based packet API
-- Entity AI API with near-1:1 NMS mappings
-- More events
-- Extension API, essentially plugins for plugins
-- Fluent dependency injection for NamespacedKey, Metadata values, etc.
-- Ultra-fast ItemStack reimplementation bypassing ItemMeta
-- Complete GUI API with pre-made components available from [ecomponent](https://github.com/Auxilor/ecomponent)
-- Over 30 native integrations for other plugins
-- First-class custom item support with lookup strings
-- Math expression parsing via [Crunch](https://github.com/Redempt/Crunch)
-- Particle lookups
-- Complete Placeholder API
-- Price system, supporting economy plugins, XP, Items, etc.
-- NMS/Version-specific tooling
-- Custom crafting recipe API with support for stacks and custom items
-- Native plugin update checking
-- Native bStats support
-- Full Kotlin support and native extensions
-- Tooling to make meta-frameworks, like [libreforge](https://github.com/Auxilor/libreforge)
-- And much more
+## 本机构建
 
-# For server owners
-- Supports 1.21.4+
+将真实依赖放入 D:/Minecraft/PluginLibs/Jars；校验值见 [本地 API 清单](docs/local-api-sha256.txt)。不得用空 API 替代缺失依赖。
 
-## Downloads
+    gradlew.bat clean shadowJar
+    gradlew.bat :eco-core:core-nms:v26_2:checkNmsLinkage
 
-- Stable: [GitHub](https://github.com/Auxilor/eco/releases), [Polymart](https://polymart.org/resource/eco.773)
-- Dev: [GitHub](https://github.com/Auxilor/eco/actions/workflows/java-ci.yml) (Open latest run and download)
+插件输出为 build/libs/eco-2026.36-mr.1.jar。可使用 -PexternalPluginLibDir=... 覆盖依赖目录，-PlocalPluginRepoDir=... 覆盖本地 Maven 目录。
 
-# For developers
+    gradlew.bat distribute publishPluginPublicationToLocalPluginsRepository :eco-api:publishApiPublicationToLocalPluginsRepository
 
-## Javadoc
-The 6.53.0 Javadoc can be found [here](https://javadoc.jitpack.io/com/willfp/eco/6.53.0/javadoc/)
+API 发布坐标为 com.willfp:eco:2026.36-mr.1，完整插件为 com.willfp:eco-plugin:2026.36-mr.1，默认发布至 D:/Minecraft/PluginLibs/Maven。
 
-## Plugin Information
+## 下游依赖
 
-eco is a standalone plugin, so you will need to install it on any servers that have plugins which depend on it,
-and specify it as a dependency in your plugin.yml:
+下游构建从本地 Maven 读取上述 API；服务器安装完整插件，在下游 plugin.yml 声明 depend: [eco]。eco 本身不提供 /eco reload 命令；开发者通过 EcoPlugin.reload() 调用重载 API。
 
-```yaml
-depend:
-  - eco
-```
+## 配置和数据
 
-## Dependency Information:
+保留 YAML、MySQL、MariaDB 和 MongoDB 存储支持。修改 data-handler 前应备份持久化数据。数据库连接信息只写入服务器私有配置，不提交仓库。
 
-Gradle:
+原有 use-display-frame、display-frame-ttl、use-immediate-placeholder-translation-for-math 等配置继续生效。默认保留旧版强制非斜体的 Lore 格式语义。
 
-```kts
-repositories {
-        maven("https://repo.auxilor.io/repository/maven-public/")
-}
-
-```
-
-```groovy
-dependencies {
-        compileOnly("com.willfp:eco:Tag")
-}
-```
-
-Replace `Tag` with a release tag for eco, eg `6.53.0`.
-
-Maven:
-
-```xml
-<repository>
-        <id>auxilor</id>
-        <url>https://repo.auxilor.io/repository/maven-public/</url>
-</repository>
-```
-
-```xml
-<dependency>
-        <groupId>com.willfp</groupId>
-        <artifactId>eco</artifactId>
-        <version>Tag</version>
-        <scope>provided</scope>
-</dependency>
-```
-
-Replace `Tag` with a release tag for eco, eg `6.53.0`.
-
-## Build locally:
-
-Run the following commands in your terminal of choice.
-
-If you're on windows, you will need to have git bash installed.
-```
-git clone https://github.com/Auxilor/eco
-cd eco
-./gradlew build
-```
-
-## License
-
-eco is licensed under the MIT license. *Click here to read [the entire license](https://github.com/Auxilor/eco/blob/master/LICENSE.md).*
-
-<h1 align="center">
-  Check out our partners!
-  <br>
-  <div style="width: 50%; margin: 0 auto;">
-  <br>
-    <a href="https://gamersupps.gg/discount/Auxilor?afmc=Auxilor" target="_blank">
-      <img src="https://i.imgur.com/7mFhlQO.png" alt="supps banner">
-    </a>
-    <a href="https://dedimc.promo/Auxilor" target="_blank">
-      <img src="https://i.imgur.com/x9aeH38.png" alt="dedimc banner">
-    </a>
-  <br>
-  </div>
-</h1>
+保留上游 [MIT 许可证](LICENSE.md) 和作者归属。

@@ -3,33 +3,41 @@ package com.willfp.eco.core.placeholder;
 import com.willfp.eco.core.placeholder.context.PlaceholderContext;
 import com.willfp.eco.util.PatternUtils;
 import com.willfp.eco.util.StringUtils;
+
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A arguments that cannot be registered, and exists purely in injection.
+ * A placeholder that cannot be registered, and exists purely in injection.
  */
 public final class StaticPlaceholder implements InjectablePlaceholder {
     /**
-     * The name of the arguments.
+     * The identifier, wrapped in percent signs, e.g. "%identifier%".
      */
     private final String identifier;
 
     /**
-     * The arguments pattern.
+     * The raw identifier, used to lazily compile the pattern.
      */
-    private final Pattern pattern;
+    private final String rawIdentifier;
 
     /**
-     * The function to retrieve the output of the arguments.
+     * The placeholder pattern, lazily initialized from the raw identifier.
+     */
+    @Nullable
+    private volatile Pattern pattern = null;
+
+    /**
+     * The function to retrieve the value of the placeholder.
      */
     private final Supplier<@Nullable String> function;
 
     /**
-     * Create a new player arguments.
+     * Create a new static placeholder.
      *
      * @param identifier The identifier.
      * @param function   The function to retrieve the value.
@@ -37,7 +45,7 @@ public final class StaticPlaceholder implements InjectablePlaceholder {
     public StaticPlaceholder(@NotNull final String identifier,
                              @NotNull final Supplier<@Nullable String> function) {
         this.identifier = "%" + identifier + "%";
-        this.pattern = PatternUtils.compileLiteral(identifier);
+        this.rawIdentifier = identifier;
         this.function = function;
     }
 
@@ -48,9 +56,9 @@ public final class StaticPlaceholder implements InjectablePlaceholder {
     }
 
     /**
-     * Get the value of the arguments.
+     * Get the value of the placeholder.
      *
-     * @return The value.
+     * @return The value, or an empty string if the supplier returned null.
      * @deprecated Use {@link #getValue(String, PlaceholderContext)} instead.
      */
     @Deprecated(since = "6.56.0", forRemoval = true)
@@ -75,7 +83,25 @@ public final class StaticPlaceholder implements InjectablePlaceholder {
     @NotNull
     @Override
     public Pattern getPattern() {
-        return this.pattern;
+        Pattern result = this.pattern;
+
+        if (result == null) {
+            synchronized (this) {
+                result = this.pattern;
+                if (result == null) {
+                    result = PatternUtils.compileLiteral(this.rawIdentifier);
+                    this.pattern = result;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    @NotNull
+    @Override
+    public String getPatternString() {
+        return this.rawIdentifier;
     }
 
     @Override
@@ -91,6 +117,6 @@ public final class StaticPlaceholder implements InjectablePlaceholder {
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.getPattern());
+        return Objects.hash(this.getPatternString());
     }
 }

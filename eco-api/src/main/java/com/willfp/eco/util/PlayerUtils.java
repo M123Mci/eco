@@ -10,7 +10,6 @@ import java.util.function.Consumer;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.block.BlockFace;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.*;
 import org.bukkit.projectiles.ProjectileSource;
@@ -52,7 +51,7 @@ public final class PlayerUtils {
      * Get the audience from a player.
      *
      * @param player The player.
-     * @return The audience.
+     * @return The audience, or an empty audience if one could not be created.
      */
     @NotNull
     public static Audience getAudience(@NotNull final Player player) {
@@ -77,7 +76,7 @@ public final class PlayerUtils {
      * Get the audience from a command sender.
      *
      * @param sender The command sender.
-     * @return The audience.
+     * @return The audience, or an empty audience if one could not be created.
      */
     @NotNull
     public static Audience getAudience(@NotNull final CommandSender sender) {
@@ -100,16 +99,18 @@ public final class PlayerUtils {
 
     /**
      * Get saved display name for an offline player.
+     * <p>
+     * If the player is online then the saved value is refreshed first.
      *
      * @param player The player.
-     * @return The player name.
+     * @return The saved display name, falling back to the player's name if none has been saved.
      */
     public static String getSavedDisplayName(@NotNull final OfflinePlayer player) {
         if (player instanceof Player onlinePlayer) {
             updateSavedDisplayName(onlinePlayer);
         }
 
-        PlayerProfile profile = PlayerProfile.load(player);
+        PlayerProfile profile = PlayerProfile.load(player.getUniqueId());
 
         String saved = profile.read(PLAYER_DISPLAY_NAME_KEY);
 
@@ -126,22 +127,24 @@ public final class PlayerUtils {
      * @param player The player.
      */
     public static void updateSavedDisplayName(@NotNull final Player player) {
-        PlayerProfile profile = PlayerProfile.load(player);
+        PlayerProfile profile = PlayerProfile.load(player.getUniqueId());
         profile.write(PLAYER_DISPLAY_NAME_KEY, player.getDisplayName());
     }
 
     /**
      * Get the saved name for an offline player.
+     * <p>
+     * If the player is online then the saved value is refreshed first.
      *
      * @param player The player.
-     * @return The player name.
+     * @return The saved name, falling back to the player's name if none has been saved.
      */
     public static String getSavedName(@NotNull final OfflinePlayer player) {
         if (player instanceof Player onlinePlayer) {
             updateSavedName(onlinePlayer);
         }
 
-        PlayerProfile profile = PlayerProfile.load(player);
+        PlayerProfile profile = PlayerProfile.load(player.getUniqueId());
 
         String saved = profile.read(PLAYER_NAME_KEY);
 
@@ -158,18 +161,21 @@ public final class PlayerUtils {
      * @param player The player.
      */
     public static void updateSavedName(@NotNull final Player player) {
-        PlayerProfile profile = PlayerProfile.load(player);
+        PlayerProfile profile = PlayerProfile.load(player.getUniqueId());
         profile.write(PLAYER_NAME_KEY, player.getName());
     }
 
     /**
      * Get the saved health for an offline player.
+     * <p>
+     * The saved value is only updated by {@link #saveHealth(Player)}, so it may be stale for an
+     * online player.
      *
      * @param player The player.
-     * @return The player health.
+     * @return The saved health in half-hearts, or 20.0 if none has been saved.
      */
     public static double getSavedHealth(@NotNull final OfflinePlayer player) {
-        PlayerProfile profile = PlayerProfile.load(player);
+        PlayerProfile profile = PlayerProfile.load(player.getUniqueId());
 
         return profile.read(PLAYER_HEALTH_KEY);
     }
@@ -180,15 +186,18 @@ public final class PlayerUtils {
      * @param player The player.
      */
     public static void saveHealth(@NotNull final Player player) {
-        PlayerProfile profile = PlayerProfile.load(player);
+        PlayerProfile profile = PlayerProfile.load(player.getUniqueId());
         profile.write(PLAYER_HEALTH_KEY, player.getHealth());
     }
 
     /**
-     * Run something with the player exempted.
+     * Run something with the player exempted from anticheats.
+     * <p>
+     * The player is exempted through the {@link AnticheatManager} for the duration of the action,
+     * and is unexempted afterwards even if the action throws.
      *
      * @param player The player.
-     * @param action The action.
+     * @param action The action, which is passed the player.
      */
     public static void runExempted(@NotNull final Player player,
                                    @NotNull final Consumer<Player> action) {
@@ -201,7 +210,10 @@ public final class PlayerUtils {
     }
 
     /**
-     * Run something with the player exempted.
+     * Run something with the player exempted from anticheats.
+     * <p>
+     * The player is exempted through the {@link AnticheatManager} for the duration of the action,
+     * and is unexempted afterwards even if the action throws.
      *
      * @param player The player.
      * @param action The action.
@@ -218,8 +230,11 @@ public final class PlayerUtils {
 
     /**
      * Try an entity as a player.
+     * <p>
+     * Resolves the entity itself if it is a {@link Player}, the shooter of a {@link Projectile},
+     * or the owner of a {@link Tameable}.
      *
-     * @param entity The entity.
+     * @param entity The entity, may be null.
      * @return The player, or null if no player could be found.
      */
     @Nullable
@@ -249,45 +264,19 @@ public final class PlayerUtils {
         return null;
     }
 
+    private PlayerUtils() {
+        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+    }
+
     /**
      * Gives the player the amount of experience specified.
      *
      * @param player       The player.
-     * @param amount       The amount.
-     * @param applyMending Mend players items with mending, with same behavior as picking up orbs.
+     * @param amount       The amount of experience points to give.
+     * @param applyMending If items enchanted with Mending should be repaired first, with the same
+     *                     behaviour as picking up experience orbs.
      */
     public static void giveExpAndApplyMending(@NotNull Player player, int amount, boolean applyMending) {
         Eco.get().giveExpAndApplyMending(player, amount, applyMending);
-    }
-
-    /**
-     * Gets all 6 directions a player might be looking.
-     *
-     * @param player The player.
-     * @return The direction a player is facing.
-     */
-    public static BlockFace getDirection(Player player) {
-        float pitch = player.getLocation().getPitch();
-        float yaw = player.getLocation().getYaw();
-
-        if (pitch < -45) {
-            return BlockFace.UP;
-        } else if (pitch > 45) {
-            return BlockFace.DOWN;
-        }
-
-        double rotation = (yaw - 90) % 360;
-        if (rotation < 0) rotation += 360;
-
-        if (0 <= rotation && rotation < 45) return BlockFace.WEST;
-        if (45 <= rotation && rotation < 135) return BlockFace.NORTH;
-        if (135 <= rotation && rotation < 225) return BlockFace.EAST;
-        if (225 <= rotation && rotation < 315) return BlockFace.SOUTH;
-
-        return BlockFace.EAST;
-    }
-
-    private PlayerUtils() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 }

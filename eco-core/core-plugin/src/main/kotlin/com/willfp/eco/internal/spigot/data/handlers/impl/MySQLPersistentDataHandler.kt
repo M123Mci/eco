@@ -132,6 +132,10 @@ class MySQLPersistentDataHandler(
         }.createTable())
     }
 
+    override fun doClose() {
+        dataSource.close()
+    }
+
     @OptIn(ExperimentalUuidApi::class)
     override fun getSavedUUIDs(): Set<UUID> {
         val savedUUIDs = mutableSetOf<UUID>()

@@ -55,6 +55,10 @@ class LegacyMySQLPersistentDataHandler(
         PersistentDataKeyType.STRING_LIST.registerSerializer(this, LegacyMySQLSerializer<List<String>>())
     }
 
+    override fun doClose() {
+        dataSource.close()
+    }
+
     override fun getSavedUUIDs(): Set<UUID> {
         return transaction(database) {
             table.selectAll()

@@ -100,6 +100,10 @@ class LegacyMongoDBPersistentDataHandler(
         })
     }
 
+    override fun doClose() {
+        client.close()
+    }
+
     override fun getSavedUUIDs(): Set<UUID> {
         return runBlocking {
             collection.find().toList().map {
